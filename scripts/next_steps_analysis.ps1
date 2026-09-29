@@ -57,7 +57,7 @@ if ($isGithub -and $ghOk) {
 }
 
 $todos = @()
-$g = git grep -n -E 'TODO|FIXME|XXX|HACK' 2>$null
+$g = git grep -n -E 'TODO|FIXME|XXX|HACK' -- . ':(exclude)*.md' ':(exclude)*.markdown' ':(exclude)*.json' ':(exclude)*.txt' ':(exclude)*.rst' 2>$null
 if ($g) { $todos = @($g -split "`n" | Select-Object -First 30 | Where-Object { $_ }) }
 
 $branches = @()
