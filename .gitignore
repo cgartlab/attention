@@ -1,0 +1,9 @@
+# write-tool temp artifacts
+*.tmpdir/
+*.tmp
+# OS / editor junk
+.DS_Store
+Thumbs.db
+*.swp
+# local test scratch
+__lzsnap_test/

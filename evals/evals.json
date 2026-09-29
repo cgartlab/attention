@@ -1,0 +1,56 @@
+{
+  "skill_name": "lizheng",
+  "evals": [
+    {
+      "id": 1,
+      "name": "clean-github-repo-sync",
+      "prompt": "我刚push完一个功能到github，本地应该是干净的，帮我立正一下这个项目同步同步，把没用的分支清一清，顺便给点下一步方向。",
+      "expected_output": "对干净仓库：ff-only拉取默认分支、仅删除已合并的无价值分支（本地与远程）、保留受保护分支、给出基于真实信号的下一步建议；不force push、不删未合并分支。",
+      "files": [],
+      "assertions": [
+        {"text": "使用 git pull --ff-only 同步默认分支，未产生合并提交"},
+        {"text": "仅删除已完全合并入默认分支的分支，未删除任何未合并分支"},
+        {"text": "未对默认分支或受保护分支执行 force push 或删除"},
+        {"text": "下一步建议基于真实信号（近期提交/开放issue-PR/TODO/测试信号），未编造"}
+      ]
+    },
+    {
+      "id": 2,
+      "name": "dirty-wip-fix-and-pr",
+      "prompt": "这个项目我改了一半，src里有几个文件没提交，估计还跑不通，立正一下，帮我弄能发就发个PR。",
+      "expected_output": "脏态：诊断未提交改动、提修复计划、执行修复至测试绿（或如实报告阻塞）、提交前同步核心文档、在GitHub开PR。",
+      "files": [],
+      "assertions": [
+        {"text": "先诊断全部未提交/未推送改动并出清单，未边找边改"},
+        {"text": "修复后测试/lint/build 绿，或如实报告未通过的项"},
+        {"text": "提交前更新了核心文档以反映真实 diff，未编造文档内容"},
+        {"text": "在 GitHub 上创建了 PR，PR 描述含动机/改动/验证/一致性声明"}
+      ]
+    },
+    {
+      "id": 3,
+      "name": "version-bump-release-consistency",
+      "prompt": "立正，这次改了package.json的版本号要发版，顺便cargo workspace那个版本也得一起对齐，确保版本号一致再提PR。",
+      "expected_output": "涉及release：审计所有版本文件、一致bump、补CHANGELOG、不编造版本号、不擅自跳大版本。",
+      "files": [],
+      "assertions": [
+        {"text": "检测到涉及 release 并触发发行版本门槛"},
+        {"text": "所有版本承载文件的版本号一致（一致bump）"},
+        {"text": "CHANGELOG 补了仅基于真实 diff 的条目，未编造版本或变更"},
+        {"text": "版本号经用户确认或来自真实版本文件，未擅自跳大版本"}
+      ]
+    },
+    {
+      "id": 4,
+      "name": "non-github-remote-fallback",
+      "prompt": "这是我们内网gitlab的项目，帮我立正整理一下，该提交提交，能开MR就开。",
+      "expected_output": "非GitHub：完成本地流程，给出PR/MR就绪产物与手动指引，不调用 gh pr create。",
+      "files": [],
+      "assertions": [
+        {"text": "未调用 gh pr create（远程非 GitHub）"},
+        {"text": "完成了本地提交与文档/版本一致性保证"},
+        {"text": "输出了 PR/MR 就绪产物（分支、diff 概览、建议标题/正文、宿主创建指引）"}
+      ]
+    }
+  ]
+}
