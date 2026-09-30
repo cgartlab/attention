@@ -144,10 +144,55 @@ function Get-CargoLockVersion([string]$rootName, [string]$file) {
 }
 function Test-SegExcluded([string]$p) {
   $s = "/$p/"
-  foreach ($seg in 'node_modules','.git','target','dist','build','.venv','venv','__pycache__','obj','bin') {
+  # vendor/third_party/Pods/bower_components 必须在表里：第三方内嵌依赖常未被 .gitignore
+  # 排除，实测 vendor/sub/Cargo.toml 会被收进来、当成自有版本文件，报假"不一致"。
+  foreach ($seg in 'node_modules','.git','target','dist','build','.venv','venv','__pycache__','obj','bin','vendor','third_party','Pods','bower_components') {
     if ($s -clike "*/$seg/*") { return $true }
   }
   return $false
+}
+# Cargo.toml 的 [workspace].members 列表（支持多行数组，含 `packages/*` 通配）
+function Get-CargoMembers([string]$file) {
+  $out = @()
+  $inArr = $false
+  foreach ($line0 in @(Get-Content -LiteralPath $file -ErrorAction SilentlyContinue)) {
+    $line = [string]$line0
+    if (-not $inArr) {
+      if ($line -cnotmatch '^[ \t]*members[ \t]*=') { continue }
+      $i = $line.IndexOf('[')
+      if ($i -lt 0) { continue }
+      $inArr = $true
+      $line = $line.Substring($i + 1)
+    }
+    foreach ($m in [regex]::Matches($line, '"([^"]*)"')) { $out += $m.Groups[1].Value }
+    if ($line.Contains(']')) { break }
+  }
+  return ,$out
+}
+# 成员写 `version.workspace = true` 或 `version = { workspace = true }` 时没有字面版本
+function Test-CargoInheritsVersion([string]$file) {
+  if (Get-FirstLine $file '^[ \t]*version[ \t]*\.[ \t]*workspace[ \t]*=[ \t]*true') { return $true }
+  if (Get-FirstLine $file '^[ \t]*version[ \t]*=[ \t]*\{[^}]*workspace[ \t]*=[ \t]*true') { return $true }
+  return $false
+}
+# 展开 workspace members：`packages/*` 之类通配按实际含 Cargo.toml 的目录展开
+function Expand-Member([string]$rootDir, [string]$pat) {
+  $out = @()
+  if (-not $pat) { return ,$out }
+  if ($pat.StartsWith('!')) { return ,$out }
+  if ($rootDir -eq '.') { $base = "./$pat" } else { $base = "$rootDir/$pat" }
+  # Resolve-Path 在 pwsh 7 里回的是绝对路径，故这里显式归一为相对仓库根（与 .sh 一致）
+  $cwd = ((Get-Location).Path -replace '\\','/')
+  if ($cwd.EndsWith('/')) { $cwd = $cwd.Substring(0, $cwd.Length - 1) }
+  foreach ($r in @(Resolve-Path -Path $base -ErrorAction SilentlyContinue)) {
+    $it = Get-Item -LiteralPath $r.Path -ErrorAction SilentlyContinue
+    if (-not $it -or -not $it.PSIsContainer) { continue }
+    $rel = ($r.Path -replace '\\','/')
+    if ($rel.StartsWith($cwd + '/')) { $rel = $rel.Substring($cwd.Length + 1) }
+    if ($rel.StartsWith('./')) { $rel = $rel.Substring(2) }
+    if (Test-Path -LiteralPath "$rel/Cargo.toml") { $out += $rel }
+  }
+  return ,$out
 }
 
 # ---------- 入参 ----------
@@ -180,8 +225,8 @@ if ($Help) {
   Write-Host "                           when no tag exists)."
   Write-Host "  --help, -h               Print this usage and exit 0."
   Write-Host ""
-  Write-Host "Fields: is_git, version_files, distinct_versions, consistent, go_mod_present,"
-  Write-Host "monorepo_mode, packages, target_version, release_signals, release_involved,"
+  Write-Host "Fields: is_git, version_files, inherited_version_files, distinct_versions, consistent,"
+  Write-Host "go_mod_present, monorepo_mode, packages, target_version, release_signals, release_involved,"
   Write-Host "changed_files, warnings."
   exit 0
 }
@@ -251,10 +296,38 @@ foreach ($f in $pool) {
 }
 $cand = UniqSort $cand
 
+# ---------- Cargo workspace 预扫描 ----------
+# 预先建立：workspace 根清单集合、成员目录 -> 根清单映射（继承与 packages 都要用）
+$wsRoots = @()
+$memberOwner = @()
+foreach ($f in @($cand | Where-Object { ($_ -split '/')[-1] -ceq 'Cargo.toml' })) {
+  $txt = Get-Content -Raw -LiteralPath $f -ErrorAction SilentlyContinue
+  if (-not ($txt -cmatch '(?m)^\[workspace\]')) { continue }
+  $wsRoots += $f
+  $slash = $f.LastIndexOf('/')
+  $d = if ($slash -ge 0) { $f.Substring(0, $slash) } else { '.' }
+  # 注意：下面这两个函数用 `return ,$out` 返回数组，调用处**不能**再套 @()，
+  # 否则会变成「只含一个数组元素」的嵌套数组（实测踩过）。
+  foreach ($m in (Get-CargoMembers $f)) {
+    foreach ($md in (Expand-Member $d $m)) { $memberOwner += [pscustomobject]@{ dir = $md; root = $f } }
+  }
+}
+# 兜底 provider：路径最浅的 [workspace] 清单（成员模式没命中该成员目录时用）
+$fallbackRoot = $null
+$bestDepth = -1
+foreach ($r in $wsRoots) {
+  $depth = 0
+  foreach ($ch in $r.ToCharArray()) { if ($ch -eq '/') { $depth++ } }
+  if ($null -eq $fallbackRoot -or $depth -lt $bestDepth -or ($depth -eq $bestDepth -and ([string]::CompareOrdinal($r, $fallbackRoot) -lt 0))) {
+    $fallbackRoot = $r; $bestDepth = $depth
+  }
+}
+
 $versionFiles = @()
 $versions = @()
 $goPresent = $false; $pkgCount = 0; $pyCount = 0; $cargoWs = $false
 $pkgDirs = @()
+$inheritedPaths = @()
 function Add-VF([string]$file, [string]$eco, [string]$v) {
   if ($null -eq $v) { return }
   $v = ([string]$v).TrimEnd("`r")
@@ -286,7 +359,13 @@ foreach ($f in $cand) {
     'Cargo.toml' {
       $txt = Get-Content -Raw -LiteralPath $f -ErrorAction SilentlyContinue
       if ($txt -cmatch '(?m)^\[workspace\]') { $script:cargoWs = $true }
-      Add-VF $f 'rust' (Grab-Q $f '^[ \t]*version[ \t]*=[ \t]*')
+      if (Test-CargoInheritsVersion $f) {
+        # 继承版本：进 inherited_version_files，**不计入** version_files/distinct_versions
+        #（否则会凭空多出一个空版本，且成员版本来源不可见）
+        $script:inheritedPaths += $f
+      } else {
+        Add-VF $f 'rust' (Grab-Q $f '^[ \t]*version[ \t]*=[ \t]*')
+      }
     }
     'Cargo.lock' {
       $rn = $null
@@ -330,6 +409,17 @@ foreach ($f in $cand) {
 $vfCount = $versionFiles.Count
 $distinct = UniqSort $versions
 
+# ---------- Cargo workspace 继承（inherits_from = 提供版本的根清单）----------
+$inherited = @()
+foreach ($mf in $inheritedPaths) {
+  $slash = $mf.LastIndexOf('/')
+  $mdir = if ($slash -ge 0) { $mf.Substring(0, $slash) } else { '.' }
+  $prov = $null
+  foreach ($mo in $memberOwner) { if ($mo.dir -ceq $mdir) { $prov = $mo.root; break } }
+  if (-not $prov) { $prov = $fallbackRoot }
+  $inherited += [pscustomobject]@{ file = $mf; inherits_from = $prov }
+}
+
 # 版本文件数为 0 -> consistent=null（空集"一致"是空洞真值）+ no-version-files 警告
 $consistent = $true
 if ($vfCount -eq 0) { $consistent = $null; Add-Warn 'no-version-files' }
@@ -341,7 +431,7 @@ if ($pkgCount -gt 1) { $monorepo = $true }
 if ($pyCount -gt 1) { $monorepo = $true }
 if ($cargoWs) { $monorepo = $true }
 foreach ($m in 'pnpm-workspace.yaml','lerna.json','nx.json') { if (Test-Path -LiteralPath $m) { $monorepo = $true } }
-$packages = UniqSort $pkgDirs
+$packages = UniqSort (@($pkgDirs) + @($memberOwner | ForEach-Object { $_.dir }))
 
 # ---- 发布信号 ----
 $range = 'HEAD'
@@ -387,6 +477,7 @@ if ($footer) { Add-Sig 'breaking-footer' $footer }
 $result = [ordered]@{
   is_git            = $true
   version_files     = @($versionFiles)
+  inherited_version_files = @($inherited)
   distinct_versions = $distinct
   consistent        = $consistent
   go_mod_present    = $goPresent

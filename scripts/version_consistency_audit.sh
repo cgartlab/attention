@@ -23,8 +23,8 @@ Options:
                            when no tag exists).
   --help, -h               Print this usage and exit 0.
 
-Fields: is_git, version_files, distinct_versions, consistent, go_mod_present,
-monorepo_mode, packages, target_version, release_signals, release_involved,
+Fields: is_git, version_files, inherited_version_files, distinct_versions, consistent,
+go_mod_present, monorepo_mode, packages, target_version, release_signals, release_involved,
 changed_files, warnings.
 USAGE
   exit 0
@@ -43,10 +43,13 @@ changed=$(changed_raw "$DEFAULT" | norm_changed)
 pool=$( { git ls-files -z 2>/dev/null; git ls-files --others --exclude-standard -z 2>/dev/null; } \
         | z2nl | tr -d '\r' | sed 's|\\|/|g' | awk 'NF' | sort -u )
 
-# 硬编码排除目录：按路径段判断（不依赖 \\ 分隔符，Linux 上同样生效）
+# 硬编码排除目录：按路径段判断（不依赖 \\ 分隔符，Linux 上同样生效）。
+# vendor/third_party/Pods/bower_components 必须在表里：第三方内嵌依赖常未被 .gitignore
+# 排除，实测 vendor/sub/Cargo.toml 会被 git ls-files 收进来、当成自有版本文件，报假"不一致"。
 seg_excluded() {
   case "/$1/" in
-    */node_modules/*|*/.git/*|*/target/*|*/dist/*|*/build/*|*/.venv/*|*/venv/*|*/__pycache__/*|*/obj/*|*/bin/*) return 0;;
+    */node_modules/*|*/.git/*|*/target/*|*/dist/*|*/build/*|*/.venv/*|*/venv/*|*/__pycache__/*|*/obj/*|*/bin/*|\
+*/vendor/*|*/third_party/*|*/Pods/*|*/bower_components/*) return 0;;
   esac
   return 1
 }
@@ -68,6 +71,74 @@ composer.json|pubspec.yaml|mix.exs|MODULE.bazel|DESCRIPTION|Chart.yaml|Package.s
 done <<< "$pool"
 cand=$(printf '%s\n' "$cand" | awk 'NF' | sort -u)
 
+# ---------- Cargo workspace 预扫描 ----------
+# Cargo.toml 的 [workspace].members 列表（每行一个模式；支持多行数组，含 `packages/*` 通配）
+cargo_members() {
+  awk '
+    {
+      if (!inarr) {
+        if ($0 !~ /^[ \t]*members[ \t]*=/) next
+        i = index($0, "[")
+        if (i == 0) next
+        inarr = 1
+        line = substr($0, i + 1)
+      } else { line = $0 }
+      s = line
+      while (match(s, /"[^"]*"/)) {
+        print substr(s, RSTART + 1, RLENGTH - 2)
+        s = substr(s, RSTART + RLENGTH)
+      }
+      if (index(line, "]") > 0) exit
+    }
+  ' "$1" 2>/dev/null
+}
+
+# 成员写 `version.workspace = true` 或 `version = { workspace = true }` 时没有字面版本
+cargo_inherits_version() {
+  grep -qE '^[[:space:]]*version[[:space:]]*\.[[:space:]]*workspace[[:space:]]*=[[:space:]]*true' "$1" 2>/dev/null && return 0
+  grep -qE '^[[:space:]]*version[[:space:]]*=[[:space:]]*\{[^}]*workspace[[:space:]]*=[[:space:]]*true' "$1" 2>/dev/null && return 0
+  return 1
+}
+
+# 展开 workspace members：`packages/*` 之类通配按实际含 Cargo.toml 的目录展开
+expand_member() { # <rootdir> <pattern>
+  local d="$1" p="$2" base m
+  case "$p" in ''|!*) return 0;; esac
+  if [ "$d" = "." ]; then base="./$p"; else base="$d/$p"; fi
+  case "$p" in
+    *'*'*|*'?'*)
+      # shellcheck disable=SC2086  # 故意让 shell 展开通配
+      for m in $base; do
+        [ -d "$m" ] && [ -f "$m/Cargo.toml" ] && printf '%s\n' "${m#./}"
+      done
+      ;;
+    *)
+      [ -d "$base" ] && [ -f "$base/Cargo.toml" ] && printf '%s\n' "${base#./}"
+      ;;
+  esac
+  return 0
+}
+
+# 预先建立：workspace 根清单集合、成员目录 -> 根清单映射（规则集/继承都要用）
+member_owner=""; cargo_ws_roots=""
+while IFS= read -r f; do
+  [ -n "$f" ] || continue
+  case "${f##*/}" in Cargo.toml) ;; *) continue;; esac
+  grep -qE '^\[workspace\]' "$f" 2>/dev/null || continue
+  cargo_ws_roots+="$f"$'\n'
+  d=${f%/*}; [ "$d" = "$f" ] && d="."
+  while IFS= read -r m; do
+    [ -n "$m" ] || continue
+    while IFS= read -r md; do
+      [ -n "$md" ] || continue
+      member_owner+="$md$TAB$f"$'\n'
+    done <<< "$(expand_member "$d" "$m")"
+  done <<< "$(cargo_members "$f")"
+done <<< "$cand"
+
+# 兜底 provider：路径最浅的 [workspace] 清单（成员模式没命中该成员目录时用）
+fallback_root=$(printf '%s\n' "$cargo_ws_roots" | awk 'NF{n=gsub(/\//,"/"); print n "\t" $0}' | sort -k1,1n -k2,2 | head -1 | cut -f2)
+
 vf_out="["; vf_sep=""; versions=""; vf_paths=""
 add_vf() {
   local f="$1" eco="$2" v="$3"
@@ -79,7 +150,7 @@ add_vf() {
   vf_paths+="$f"$'\n'
 }
 
-go_present=false; pkg_count=0; py_count=0; cargo_ws=false; pkg_dirs=""
+go_present=false; pkg_count=0; py_count=0; cargo_ws=false; pkg_dirs=""; inherited_paths=""
 while IFS= read -r f; do
   [ -n "$f" ] || continue
   base=${f##*/}
@@ -94,7 +165,14 @@ while IFS= read -r f; do
       add_vf "$f" node-lock "$v" ;;
     Cargo.toml)
       grep -qE '^\[workspace\]' "$f" 2>/dev/null && cargo_ws=true
-      add_vf "$f" rust "$(grab_q "$f" '^[[:space:]]*version[[:space:]]*=[[:space:]]*')" ;;
+      if cargo_inherits_version "$f"; then
+        # 继承版本：进 inherited_version_files，**不计入** version_files/distinct_versions
+        #（否则会凭空多出一个空版本，且成员版本来源不可见）
+        inherited_paths+="$f"$'\n'
+      else
+        add_vf "$f" rust "$(grab_q "$f" '^[[:space:]]*version[[:space:]]*=[[:space:]]*')"
+      fi
+      ;;
     Cargo.lock)
       rn=""
       [ -f Cargo.toml ] && rn=$(grab_q Cargo.toml '^[[:space:]]*name[[:space:]]*=[[:space:]]*')
@@ -130,6 +208,21 @@ while IFS= read -r f; do
 done <<< "$cand"
 vf_out+="]"
 
+# ---------- Cargo workspace 继承（inherits_from = 提供版本的根清单）----------
+inh_out="["; inh_sep=""
+while IFS= read -r mf; do
+  [ -n "$mf" ] || continue
+  mdir=${mf%/*}; [ "$mdir" = "$mf" ] && mdir="."
+  provider=""
+  while IFS=$TAB read -r md rm; do
+    [ -n "$md" ] || continue
+    if [ "$md" = "$mdir" ]; then provider="$rm"; break; fi
+  done <<< "$member_owner"
+  [ -n "$provider" ] || provider="$fallback_root"
+  inh_out+="${inh_sep}{\"file\":\"$(jes "$mf")\",\"inherits_from\":$(jstr "$provider")}"; inh_sep=","
+done <<< "$inherited_paths"
+inh_out+="]"
+
 vf_count=$(printf '%s\n' "$vf_paths" | grep -c . )
 distinct=$(printf '%s\n' "$versions" | awk 'NF' | sort -u)
 distinct_count=$(printf '%s\n' "$distinct" | grep -c . )
@@ -150,7 +243,7 @@ monorepo=false
 for m in pnpm-workspace.yaml lerna.json nx.json; do
   [ -f "$m" ] && monorepo=true
 done
-packages=$(printf '%s\n' "$pkg_dirs" | awk 'NF' | sort -u)
+packages=$( { printf '%s\n' "$pkg_dirs"; printf '%s\n' "$member_owner" | cut -f1; } | tr -d '\r' | awk 'NF' | sort -u )
 
 # ---- 发布信号 ----
 crange="HEAD"
@@ -195,7 +288,7 @@ release_involved=false
 [ -n "$touched" ] && release_involved=true
 
 tv="null"; [ -n "$TARGET_VERSION" ] && tv="\"$(jes "$TARGET_VERSION")\""
-printf '{"is_git":true,"version_files":%s,"distinct_versions":%s,"consistent":%s,"go_mod_present":%s,"monorepo_mode":%s,"packages":%s,"target_version":%s,"release_signals":%s,"release_involved":%s,"changed_files":%s,"warnings":%s}\n' \
-  "$vf_out" "$(printf '%s\n' "$distinct" | jarr_str)" "$consistent" "$go_present" "$monorepo" \
+printf '{"is_git":true,"version_files":%s,"inherited_version_files":%s,"distinct_versions":%s,"consistent":%s,"go_mod_present":%s,"monorepo_mode":%s,"packages":%s,"target_version":%s,"release_signals":%s,"release_involved":%s,"changed_files":%s,"warnings":%s}\n' \
+  "$vf_out" "$inh_out" "$(printf '%s\n' "$distinct" | jarr_str)" "$consistent" "$go_present" "$monorepo" \
   "$(printf '%s\n' "$packages" | jarr_str)" "$tv" "$sig_out" "$release_involved" \
   "$(printf '%s\n' "$changed" | jarr_str)" "$(printf '%s\n' "$warns" | jarr_str)"
