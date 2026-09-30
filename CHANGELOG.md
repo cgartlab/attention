@@ -25,6 +25,7 @@
 - TODO 扫描排除自身源文件（`scripts/next_steps_analysis.ps1` 与 `.sh`），消除自指假阳性（dogfood 发现 P1 引入 .sh 后 .ps1 只排除 .ps1 导致自指 .sh，已修：两变体都排除两文件）。
 - `AGENTS.md` 自检行更新此前因 `-like` 用半角冒号而行用全角冒号静默未生效，已用字面 .Replace 修正并指向 smoke_test。
 
+- version_consistency_audit.sh 质量修复：去掉重复的 release_involved 二次扫描（改为首次扫描收集路径内联计算，与 .ps1 一致、更少代码）；修 find_versions 通配符模式未加引号导致 *.csproj 被 bash 预展开、漏掉子目录匹配的潜在 bug（现 -name "$1" 加引号）。已验 parity 与 .csproj 子目录用例。
 ### Notes
 - bash（.sh）实现**已在 git-bash 验证通过**：`bash scripts/smoke_test.sh --repo <path>` 在 lizheng + 4 个 eval fixture（clean/dirty/version/non-github）各 5/5；version_consistency_audit 的 .sh 与 .ps1 输出一致（parity 确认）。bash 位于 Git for Windows 的 bin\bash.exe（常不在 PATH，见 environment-and-prereqs §6 Windows 回退）。
 - `npx skills add cgartlab/lizheng` 安装路径需仓库推送到 GitHub 后方可验证；当前未推送（按计划推迟建远程）。
