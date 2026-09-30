@@ -44,7 +44,7 @@ metadata:
 
 ## 脚本使用约定
 
-本 skill 在 scripts/ 下提供若干黑盒数据采集脚本（PowerShell，.ps1）。它们处理确定、重复、可验证的采集，把结构化 JSON 交给你推理——避免你自己拼 git 命令时漏判或污染上下文。
+本 skill 在 scripts/ 下提供若干黑盒数据采集脚本（bash .sh 与 PowerShell .ps1 两套）。它们处理确定、重复、可验证的采集，把结构化 JSON 交给你推理——避免你自己拼 git 命令时漏判或污染上下文。
 
 **约定**：
 - **先 --help，再调用**。先看用法，按用法调用。除非 --help 不够用，不要读脚本源码——它们存在是为了被调用，不是为了被读进上下文。
@@ -73,10 +73,10 @@ Phase 4 收尾报告
 
 先 --help，再按用法调用下列脚本，拿到 JSON 后推理：
 
-- scripts/git_state_snapshot.ps1 — 当前分支、upstream 跟踪、ahead/behind、staged/unstaged/untracked（尊重 .gitignore，不纳入 node_modules 等）、stash、最近变更文件、与默认分支的散度。
-- scripts/branch_cleanup_audit.ps1 — 本地已合并分支、远程已合并分支、受保护名单、陈旧未合并分支（仅报告）。
-- scripts/version_consistency_audit.ps1 — 全部版本承载文件及其版本串、是否一致、是否"涉及 release"。
-- scripts/core_docs_relevance_scan.ps1 — 核心文档清单 + 哪些变更源文件被文档交叉引用 → 标记需更新文档。
+- scripts/git_state_snapshot — 当前分支、upstream 跟踪、ahead/behind、staged/unstaged/untracked（尊重 .gitignore，不纳入 node_modules 等）、stash、最近变更文件、与默认分支的散度。
+- scripts/branch_cleanup_audit — 本地已合并分支、远程已合并分支、受保护名单、陈旧未合并分支（仅报告）。
+- scripts/version_consistency_audit — 全部版本承载文件及其版本串、是否一致、是否"涉及 release"。
+- scripts/core_docs_relevance_scan — 核心文档清单 + 哪些变更源文件被文档交叉引用 → 标记需更新文档。
 
 > 拿齐四份快照再进 Phase 2。不要边拿边下结论。
 
@@ -96,7 +96,7 @@ Phase 4 收尾报告
 2. **剪枝已合并分支**：用 branch_cleanup_audit 的候选——仅删"已完全合并入默认分支 且 不在受保护名单"的分支。陈旧未合并分支只报告不删（删了会丢工作）。受保护名单见 references/branch-model-and-protection.md（main master develop dev trunk release/* prod production gh-pages + 仓库保护分支）。
    - 本地：git branch -d <branch>（-d 本身就拒删未合并，作为第二道保险）。
    - 远程：仅删"已合并 且 远端已无活跃对应分支"者，用 git push origin --delete 或 gh api。远程删除是不可逆——按 references/autonomy-and-safety.md 做最终确认。
-3. **下一步建议**：scripts/next_steps_analysis.ps1 综合 git log 近期提交、gh issue/pr list 开放项、TODO/FIXME grep、测试信号、分支年龄 → 给可执行方向。只基于真实信号，不编造。
+3. **下一步建议**：scripts/next_steps_analysis 综合 git log 近期提交、gh issue/pr list 开放项、TODO/FIXME grep、测试信号、缺失核心文档、分支年龄 → 给可执行方向。只基于真实信号，不编造。
 
 ## Phase 3B — 脏态修复路径
 
@@ -159,8 +159,8 @@ Phase 4 收尾报告
 
 ## scripts 索引（黑盒，先 --help）
 
-- scripts/git_state_snapshot.ps1 — 仓库状态快照
-- scripts/branch_cleanup_audit.ps1 — 分支剪枝候选审计
-- scripts/version_consistency_audit.ps1 — 版本一致性审计
-- scripts/core_docs_relevance_scan.ps1 — 核心文档相关性扫描
-- scripts/next_steps_analysis.ps1 — 下一步建议信号采集
+- scripts/git_state_snapshot — 仓库状态快照
+- scripts/branch_cleanup_audit — 分支剪枝候选审计
+- scripts/version_consistency_audit — 版本一致性审计
+- scripts/core_docs_relevance_scan — 核心文档相关性扫描
+- scripts/next_steps_analysis — 下一步建议信号采集
