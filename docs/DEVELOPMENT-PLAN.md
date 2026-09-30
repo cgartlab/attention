@@ -1,7 +1,7 @@
 # 立正Skill 通用化开发计划
 
 > 目标：让立正成为**任意 harness / Agent 环境**都能用的 Git 项目巡检与修复 skill——不绑定某一操作系统、某一 shell、某一 harness。
-> 状态：v0.2.0（pwsh 脚本，已在 Windows/DSH 环境验证）；本计划通往 v1.0（跨 harness 通用）。
+> 状态：v0.1.0（pwsh 脚本，已在 Windows/DSH 环境验证）；本计划目标是跨 harness 通用化（版本号贯穿保持 0.1.0，升 1.0 由用户定）。
 
 ## 一、调研发现（GitHub 类似 skill 与可移植性信号）
 
@@ -99,9 +99,13 @@
 | 跨 harness evals 受 subagent 可用性限制 | 在能跑的环境跑；本 env 用父代理自跑适配 |
 | bash 在原生 Windows 缺失 | pwsh 实现层覆盖；回退层兜底 |
 
-## 七、里程碑
+## 七、版本策略与里程碑
 
-- **v0.3.0** — P1 完成（bash+pwsh 双实现，shell 探测）。
-- **v0.4.0** — P2 完成（Agent Skills 对齐，可 `npx skills add`）。
-- **v0.5.0** — P3 完成（无脚本回退 + 依赖最小化）。
-- **v1.0.0** — P4+P5 完成（≥2 harness evals 通过，通用化打磨）。
+**版本策略**：技能尚不完善，贯穿 P1–P5 **版本号保持 0.1.0**，不随阶段递增。阶段产出记入 CHANGELOG `[Unreleased]`，不切版本号。是否升至 1.0.0 由用户在 P5 完成后决定，不在本计划内自动切。
+
+**阶段里程碑（不绑版本号）**：
+- P1 完成 — bash+pwsh 双实现，shell 探测。
+- P2 完成 — Agent Skills 对齐，可 `npx skills add`。
+- P3 完成 — 无脚本回退 + 依赖最小化。
+- P4 完成 — ≥2 harness evals 通过。
+- P5 完成 — 通用化打磨（双语、版本生态补全、多宿主 PR）。
