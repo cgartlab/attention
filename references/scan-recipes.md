@@ -81,5 +81,17 @@
 - behind_default：origin/<default> 存在则 `git rev-list --count origin/<default>..HEAD`
 **JSON**：`{is_git(bool), default_branch(str|null), behind_default(int|null), recent_commits(str[]), is_github(bool), gh_authed(bool), open_issues(str[]), open_prs(str[]), todo_fixme(str[]), branches([{branch,last_commit}]), test_commands([{name,script}])}`
 
-## 无脚本回退用法
-当 harness 既无 bash 也无 pwsh 脚本执行能力时，模型按本文件每节的"git 命令"直接跑（用 harness 给的任意 shell），照"JSON"小节手动组装同形 JSON，再走 Phase 2 起的判断。仅兜底，非主路径。
+## 无脚本回退用法（P3）
+
+当 harness 既不能跑 bash 也不能跑 pwsh 脚本（或只让模型直接执行命令）时，按下面步骤手动采集，保证判断流程不变：
+
+1. **跑 git 命令**：按上面每节的"git 命令"清单，用 harness 给的任意 shell 直接执行——git 命令跨平台一致，只有 shell 胶水（数组/JSON 拼装）不同。
+2. **组装 JSON**：照对应小节的"JSON"契约，把命令输出拼成同形 JSON（字段名、类型、数组元素形态都照契约；数组去重、路径转正斜杠）。
+3. **走判断**：拿组装好的 JSON 进 Phase 2 起的判断（干净/脏态分流、剪枝、修复、文档/版本门槛、报告），与脚本路径完全一致。
+
+> 权衡：回退路径靠模型每次正确跑 git + 拼 JSON，失去脚本的黑盒确定性，故仅作兜底——主路径仍是 bash（.sh）或 pwsh（.ps1）脚本。缺 `gh` 时，PR 步骤降级为"PR 就绪 diff + 手动指引"，不硬开。
+
+## 依赖与边界审计（P3）
+- **运行时依赖**：仅 `git`（必需，缺则 Phase 0 停止说明）；`gh`（可选，仅 next_steps 与开 PR 用，缺则降级）。不要求 Python/Node/pwsh/bash 作为硬依赖——它们只是某条脚本路径的前置，缺了换路径或走无脚本回退。
+- **shell profile 隔离**：pwsh 路径一律 `pwsh -NoProfile`（规避 PSReadLine/Terminal-Icons 等用户 profile 干扰）；bash 路径不读 profile。
+- **平台假设**：.ps1 用 PowerShell cmdlet（仅 pwsh 路径）；.sh 用 POSIX 工具（find/grep/sed/awk/date/tr），日期经 `epoch_of` 兼容 GNU 与 BSD。两套互不污染。
