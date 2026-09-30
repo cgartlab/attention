@@ -14,7 +14,7 @@
 - 退出码：`0` = 已产出完整 JSON（含 `is_git=false` 的正常短路）；`2` = 内部错误（此时仍须输出 `{"is_git":false,"error":"<原因>"}`，不得输出半截 JSON）。
 - **颜色**：所有 git 调用一律 `-c color.ui=never`。用户全局 `color.ui=always` 会注入 ANSI 转义，使 `--merged` 分支名比对整体失效（静默漏报剪枝候选）。
 - **失败可见**：任何 git/gh 子命令失败、跳过或降级，必须记入 `warnings[]` 或把相应字段置 `null`。**禁止**把"没查成"输出成与"确实为空"同形的 `[]`。
-- **`warnings[]`**（各脚本均可输出，默认 `[]`）：机器可读短码，至少含 `gh-query-failed`、`remote-unreachable`、`no-version-files`、`partial-parse`、`head-unborn`、`gh-host-mismatch`。
+- **`warnings[]`**（各脚本均可输出，默认 `[]`）：机器可读短码，至少含 `gh-query-failed`、`remote-unreachable`、`no-version-files`、`partial-parse`、`head-unborn`、`gh-host-mismatch`、`remote-base-unverified`、`rulesets-unavailable`、`protect-config-unreadable`。
 
 ### 路径与缺失语义（两套实现必须逐字一致）
 
@@ -63,15 +63,25 @@ staged(`git diff --cached --name-only --no-renames -z`) ∪ unstaged(`git diff -
 **git 命令**：
 - 默认分支探测（通用）；取不到 → `default_branch=null` 且 `default_branch_source=unavailable`（**不再默认 main**；无默认分支时合并判定整体跳过并加警告）
 - `git symbolic-ref --quiet --short HEAD` → current_branch
-- protected = `[main,master,develop,dev,trunk,prod,production,gh-pages,gh-readonly]` ∪ `release/*` 通配 ∪ `{current}` ∪ `{default}`，**去重后排序**；字面量 `release/*` 也列入数组（自解释），实际判定同时用通配匹配
+- protected = `[main,master,develop,dev,trunk,prod,production,gh-pages,gh-readonly]` ∪ `release/*` 通配 ∪ `{current}` ∪ `{default}` ∪ **`git config --get-all cleanup.protect` 的全部值**，**去重后排序**；字面量 `release/*` 也列入数组（自解释），实际判定同时用通配匹配。实测：`--get-all` 返回多值（`--get` 只回最后一个），故持久化保护名单必须用 `--get-all`；该项为可选增强，读取失败静默忽略（不视为错误）
+- **仓库侧保护分支（gh rules，实测纠偏）**：`gh` 可用且宿主为 GitHub 时，对**查询集合**逐个查 `gh api repos/{owner}/{repo}/rules/branches/{branch}`（`--jq 'any(.[]; .type=="deletion")'`），命中删除保护的写入 `protected_from_rulesets(str[])`。
+  - **不要用 `GET /rulesets`（列表）**：实测它只回 `id/name/target/enforcement/source/node_id/created_at/updated_at/_links`，**不含 `rules`/`conditions`**，据此判删除保护永远判不出来；`GET /rulesets/{id}` 详情虽含 `rules`，但 `rules/branches/{branch}` 已替你过滤 `enforcement`（只回 active）并展开 ref 匹配（`~DEFAULT_BRANCH`/`~ALL`/通配），更省事更准。`GET /rules/{ref}` **不存在（404）**。
+  - **陷阱**：**分支不存在时该端点返回 `[]` + HTTP 200**（不是 404）→ 必须先确认分支存在（`git ls-remote` 权威，不可用时退回 `refs/remotes/origin/<b>`），否则"拼错分支名"会被读成"没有保护"。
+  - **权限**：`Metadata (read)` 即可，公开仓库无认证也能查；老端点 `branches/{b}/protection` 不要用（无认证 401、非管理员 404）。`bypass_actors` 只读恒为 null，**不可**作判定依据。
+  - **查询集合与上限**：静态名单筛出的本地已合并候选 ∪ 远程已合并候选 ∪ 默认分支，去重排序，**硬上限 100 次调用**。命中删除保护的分支从候选中剔除（"非受保护"按**有效保护**理解）。`local_stale_unmerged_report` 不参与该查询（已知限制：陈旧未合并分支只报告，不作为删除候选）。
+  - **失败语义**：非 GitHub 宿主 / 无 gh / 无 remote / 任何一次调用失败 / 超上限 → `protected_from_rulesets=[]` + `rulesets-unavailable` 警告（**非 GitHub 也算"没查成"**，故该警告在非 GitHub 仓库上出现是正常的），绝不整体失败、绝不输出半截 JSON；也**不得**把"查不到"当成"没有保护分支"（`protected` 的静态部分只是下界）。
+  - **口径说明**：`protected_from_rulesets` 存**解析后的本地分支名**，模式匹配用 shell glob（`*` 可跨 `/`），比 GitHub 的 `*`/`**` 更宽松 → 只会**多保护**、不会漏保护（刻意保守）。
+  - **`cleanup.protect` 读取**：`git config --get-all cleanup.protect`；**exit 1（键不存在）视为正常、静默**；其他非零（真读取失败）→ `protect-config-unreadable` 警告（无法在"只坏这一处"的前提下造 fixture，故该分支仅代码走查覆盖）。
 - `git for-each-ref --format='%(refname:short)' refs/heads` → 本地分支
-- `git -c color.ui=never branch --merged origin/<default>`（本地无同名分支时用 `origin/<default>` 形态，避免 `unknown revision`）→ 去前缀 `[* ]+` → 已合并名集
+- **本地列表**：`git -c color.ui=never branch --merged <local-default>` 去前缀 `[* ]+` → 已合并名集。**本地合并必须用本地默认分支**（`main`），不能用 `origin/<default>`——本地已合并但尚未推送时用 `origin/<default>` 会把可安全删除的分支漏报（假阴性）；删除本地分支不会丢内容，因为提交已在本地默认分支里
+- **远程列表**：`git -c color.ui=never branch -r --merged origin/<default>`。**远程合并必须用 `origin/<default>`**——用本地分支作基准会在"本地已合并、远程尚未收到"时误判为已合并，删远程分支就丢数据
+- **基准守卫**：使用 `origin/<default>` 前先 `git rev-parse --verify --quiet refs/remotes/origin/<default>`；不存在则 `remote_base_unverified=true`、远程候选一律为空、并加 `remote-base-unverified` 警告。另：`origin/<default>` 落后于本地默认分支时，远程结论天然保守（宁可不删），但必须在输出里能看出来——故暴露 `local_merge_base` 与 `remote_merge_base` 两个字段
 - 每个本地分支：已合并且非受保护 → local_merged_candidates；未合并 → `git log -1 --format='%cI' <b>` 算 age_days（`now - commitdate`，阈值见 judgment-criteria：默认 30 天），超阈值且非受保护且 ≠current → local_stale_unmerged_report `{branch,last_commit,age_days}`
 - `git ls-remote origin` → refs/heads/* → name→sha 映射（remote_exists 用）；**失败 → remote_reachable=false + `remote-unreachable` 警告**（远端候选因此不可信，不得当成"没有可剪枝的远程分支"）
 - `git for-each-ref --format='%(refname:short)' refs/remotes`（取 origin/*，跳过 origin/HEAD）
-- 每个远程分支：`git branch -r --merged origin/<default>` 含 `origin/<short>` 且非受保护 → remote_merged_candidates `{branch,tracking_ref,remote_exists(bool)}`；`remote_exists` 必须用**精确匹配**（`grep -Fxq` / 哈希表），不得用无锚定子串（`feat` 会误配 `feat-x`）
+- 每个远程分支：`git branch -r --merged origin/<default>` 含 `origin/<short>` 且非受保护 → remote_merged_candidates `{branch,tracking_ref,remote_exists(bool),tip_sha(str|null)}`；`remote_exists` 必须用**精确匹配**（`grep -Fxq` / 哈希表），不得用无锚定子串（`feat` 会误配 `feat-x`）。**`tip_sha`** = 审计时该分支的 tip（`git rev-parse refs/remotes/origin/<short>`）：删除远程分支时**必须**把它传给 `git push origin --force-with-lease=<branch>:<sha> --delete <branch>`，否则确认窗口内他人推送的提交会被静默删掉（实测可复现的数据丢失）
 
-**JSON**：`{is_git(bool), default_branch(str|null), default_branch_source(str), current_branch(str|null), remote_reachable(bool), protected(str[]), local_merged_candidates(str[]), local_stale_unmerged_report([{branch,last_commit,age_days}]), remote_merged_candidates([{branch,tracking_ref,remote_exists}]), warnings(str[])}`
+**JSON**：`{is_git(bool), default_branch(str|null), default_branch_source(str), current_branch(str|null), remote_reachable(bool), protected_from_rulesets(str[]), local_merge_base(str|null), remote_merge_base(str|null), remote_base_unverified(bool), protected(str[]), local_merged_candidates(str[]), local_stale_unmerged_report([{branch,last_commit,age_days}]), remote_merged_candidates([{branch,tracking_ref,remote_exists,tip_sha}]), warnings(str[])}`
 
 > 远程剪枝的可判定条件见 `branch-model-and-protection.md`：候选来自 remote-tracking ref，**不能**要求"远端已无对应 ref"（`fetch --prune` 之后恒假）。
 
@@ -81,7 +91,7 @@ staged(`git diff --cached --name-only --no-renames -z`) ∪ unstaged(`git diff -
 
 **用途**：版本文件一致性 + 发布信号（**不是**"是否涉及 release"的最终判定）。
 **git 命令**：变更集（通用）。
-**文件池（必须尊重 .gitignore）**：`git ls-files` ∪ `git ls-files --others --exclude-standard`。**不得**用裸目录遍历——那会把 `vendor/`、`.cache/` 等被忽略目录里的清单文件当成版本文件（假"版本不一致"）。硬编码排除目录（`node_modules|.git|target|dist|build|.venv|venv|__pycache__|obj|bin`）仅作二次防御，且必须按**路径段**判断（不得依赖 `\\` 分隔符，否则 Linux 上全部失效）。
+**文件池（必须尊重 .gitignore）**：`git ls-files` ∪ `git ls-files --others --exclude-standard`。**不得**用裸目录遍历——那会把 `vendor/`、`.cache/` 等被忽略目录里的清单文件当成版本文件（假"版本不一致"）。硬编码排除目录（`node_modules|.git|target|dist|build|.venv|venv|__pycache__|obj|bin|vendor|third_party|Pods|bower_components`）作为二次防御——**`vendor`/`third_party` 必须在内**：第三方内嵌依赖常未被 `.gitignore` 排除，实测会把 `vendor/sub/Cargo.toml` 当成自有版本文件并报假"不一致"。排除必须按**路径段**判断（不得依赖 `\\` 分隔符，否则 Linux 上全部失效）。
 
 **生态与版本字段**（检测到即纳入；详表见 `references/version-file-inventory.md`）：
 - `package.json` → node，**顶层** `.version`（不得取 `dependencies.*.version` 等嵌套同名键）
@@ -102,10 +112,11 @@ staged(`git diff --cached --name-only --no-renames -z`) ∪ unstaged(`git diff -
   - `breaking-footer`：`git log --format='%h %B' <range>` 前 20 行内出现 `BREAKING CHANGE:` / `BREAKING-CHANGE:`
   - `user-intent`：仅当调用方传 `--target-version` 或用户明示发版时由**模型**补写（脚本自身不臆测用户话语）
   - sample 为触发样例（commit 短哈希 + 标题，或文件路径）
-- monorepo_mode / packages（**新增**）：检测 `pnpm-workspace.yaml`、`lerna.json`、`nx.json`、`Cargo.toml` 的 `[workspace]`、**或"多于一个 `package.json`"或"多于一个 `pyproject.toml`"**（按类型分别计数，不是合计——多生态单包仓库不算 monorepo）→ `monorepo_mode=true`，`packages` 为包目录列表（相对路径，排序）
+- monorepo_mode / packages：检测 `pnpm-workspace.yaml`、`lerna.json`、`nx.json`、`Cargo.toml` 的 `[workspace]`、**或"多于一个 `package.json`"或"多于一个 `pyproject.toml`"**（按类型分别计数，不是合计——多生态单包仓库不算 monorepo）→ `monorepo_mode=true`。`packages` = 包**目录**列表（相对路径、排序）：Cargo workspace 取 `[workspace].members`（支持 `packages/*` 通配展开为实际含 `Cargo.toml` 的目录），npm/pnpm 取含 `package.json` 的包目录
+- **Cargo workspace 版本继承（必须识别，不得静默漏掉）**：成员清单里的 `Cargo.toml` 若写 `version.workspace = true` 或 `version = { workspace = true }`，它**没有字面版本**，其版本来自根 `[workspace.package].version`。这类文件进 `inherited_version_files([{file, inherits_from}])`（`inherits_from` = 提供版本的根清单路径），**不计入** `version_files`/`distinct_versions`（否则会凭空多出一个空版本）。实测：不识别时成员完全不可见，`packages` 也为空
 - target_version（**新增**）：`--target-version` 的回显（null=未指定）
 
-**JSON**：`{is_git(bool), version_files([{file,ecosystem,version}]), distinct_versions(str[]), consistent(bool|null), go_mod_present(bool), monorepo_mode(bool), packages(str[]), target_version(str|null), release_signals([{kind,sample}]), release_involved(bool), changed_files(str[]), warnings(str[])}`
+**JSON**：`{is_git(bool), version_files([{file,ecosystem,version}]), inherited_version_files([{file,inherits_from}]), distinct_versions(str[]), consistent(bool|null), go_mod_present(bool), monorepo_mode(bool), packages(str[]), target_version(str|null), release_signals([{kind,sample}]), release_involved(bool), changed_files(str[]), warnings(str[])}`
 
 > `release_involved` 保留为**兼容字段**，语义收窄为"`release_signals` 含 `version-file-touched`"。是否发行版本门槛的最终判定属模型职责，见 `judgment-criteria.md` 的多层门表格。
 

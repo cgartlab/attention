@@ -18,8 +18,10 @@ Phase 2 分流与各门槛的精确边界。判定要保守：拿不准归脏态
 ## 无价值分支（可删候选）
 需同时满足：
 
-1. **已完全合并入默认分支**：本地 `git branch --merged origin/<默认分支>`；远程 `git branch -r --merged origin/<默认分支>`。
-   - **形态要求**：统一用 `origin/<默认分支>`。本地没有同名分支时 `git branch --merged <默认分支>` 会 `unknown revision`，静默给出空集（把全部候选漏报成"没有可清理的分支"）。
+1. **已完全合并入默认分支**：本地列表用**本地默认分支** `git branch --merged <本地默认分支>`；远程列表用 **`origin/<默认分支>`** `git branch -r --merged origin/<默认分支>`。
+   - **为什么两侧基准不同（实测教训）**：删本地分支不丢内容（提交已在本地默认分支里），所以本地用本地分支即可；改用 `origin/<默认分支>` 会把"本地已合并但尚未推送"的候选**漏报成空集**（假阴性）。删远程分支不可逆，必须用 `origin/<默认分支>`——用本地分支作基准会在"本地已合并、远程尚未收到"时误判为已合并，**删远程分支即丢数据**。
+   - **基准守卫**：用 `origin/<默认分支>` 前先 `git rev-parse --verify --quiet refs/remotes/origin/<默认分支>`；不存在 → `remote_base_unverified=true`、远程候选一律为空、加 `remote-base-unverified` 警告。脚本输出 `local_merge_base`/`remote_merge_base` 两个字段供复核。
+   - **形态注意**：本地默认分支不存在时 `git branch --merged <名字>` 会 `unknown revision` 并静默给空集——此时回退到 `origin/<默认分支>`，并在 `local_merge_base` 里体现用的是哪一个。
 2. **不在受保护名单**（名单与判定见 `branch-model-and-protection.md`）。
 3. **远程候选另有第四条判据**：见 `branch-model-and-protection.md` 的"远程剪枝"（已合并 + 非受保护 + **无开放 PR**）。
    - ❌ **不得**把删除条件写成"远端已经没有这个分支了"（或等价的"远端不再有对应 ref"）：候选本身就来自 remote-tracking ref，`git fetch --prune` 之后该条件**恒假**，规则会退化成永远没有候选（表面"干净"，实际漏报）。

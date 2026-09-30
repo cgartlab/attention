@@ -3,7 +3,7 @@
 ## 分层确认模型
 - **只读分析**（所有 snapshot/audit 脚本、`git fetch`、`git log`、issue/PR 列表）：始终自动。
 - **本地变更**（编辑文件、`git add`、`git commit`、本地 `git branch -d`、**本地 `git tag`**）：计划门槛一次批准后自动执行。
-- **远程不可逆**（**`git push`（任何分支的普通推送也算）**、`git push origin --delete`、`gh pr create`、**`git push <remote> <tag>`**、对远程默认分支的任何写入）：**在执行点单独做最终确认**。
+- **远程不可逆**（**`git push`（任何分支的普通推送也算）**、`git push origin --delete`（**必须带 `--force-with-lease=<branch>:<sha>`**，见 `branch-model-and-protection.md`）、`gh pr create`、**`git push <remote> <tag>`**、对远程默认分支的任何写入）：**在执行点单独做最终确认**。
 
 ### ⚠️ 计划门槛不覆盖 push
 计划批准的是"改哪些文件、提交什么、删哪些本地分支"——**不含任何远程写入**。
