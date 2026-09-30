@@ -26,7 +26,7 @@
 - `AGENTS.md` 自检行更新此前因 `-like` 用半角冒号而行用全角冒号静默未生效，已用字面 .Replace 修正并指向 smoke_test。
 
 ### Notes
-- bash（.sh）实现未在本环境验证（无 bash）；现可用 `bash scripts/smoke_test.sh --repo <path>` 一键验证，待有 bash 的环境实跑。
+- bash（.sh）实现**已在 git-bash 验证通过**：`bash scripts/smoke_test.sh --repo <path>` 在 lizheng + 4 个 eval fixture（clean/dirty/version/non-github）各 5/5；version_consistency_audit 的 .sh 与 .ps1 输出一致（parity 确认）。bash 位于 Git for Windows 的 bin\bash.exe（常不在 PATH，见 environment-and-prereqs §6 Windows 回退）。
 - `npx skills add cgartlab/lizheng` 安装路径需仓库推送到 GitHub 后方可验证；当前未推送（按计划推迟建远程）。
 
 ## [0.1.0] - 2026-09-29

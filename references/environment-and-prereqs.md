@@ -37,6 +37,7 @@
 立正的采集脚本有 bash（.sh）与 PowerShell（.ps1）两套实现，输出同形 JSON（契约见 `references/scan-recipes.md`）。Phase 0 探测可用 shell 后选路径：
 
 1. **bash 可用**（`command -v bash` 成功）→ 用 `.sh`：`bash "<base>/scripts/<name>.sh" --repo <path>`。覆盖 Linux/macOS/WSL/Claude Code/Cursor。
+   - **Windows 注意**：Git for Windows 自带 bash.exe 但常不在 PATH，command -v bash 会漏。检测失败时查 git 安装目录下的 bin\bash.exe（由 git 路径推导，如 C:\Program Files\Git\bin\bash.exe），找到即用该全路径调 .sh。
 2. **否则 pwsh 可用**（`pwsh -v` 成功）→ 用 `.ps1`：`pwsh -NoProfile -File "<base>/scripts/<name>.ps1" --repo <path>`。覆盖 Windows/DSH。
 3. **两者都不可用**（harness 只让模型直接执行命令）→ 无脚本回退：模型按 `references/scan-recipes.md` 的 git 命令配方，用 harness 给的任意 shell 直接跑 git 并自行组装 JSON；判断流程不变。
 
