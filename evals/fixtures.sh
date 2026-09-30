@@ -28,7 +28,7 @@ usage() {
   --json            以 JSON 打印摘要 {out_dir,count,fixtures:[{id,label,path,notes}]}
   -h, --help        显示本帮助
 
-生成的 14 个 fixture（F1-F14）与 evals/fixtures.ps1 完全一致。
+生成的 19 个 fixture（F1-F19）与 evals/fixtures.ps1 完全一致。
 USAGE
 }
 
@@ -197,7 +197,7 @@ register_fixture() {
   NOTES[${#NOTES[@]}]=$4
 }
 
-# ============ F1-F14 ============
+# ============ F1-F19 ============
 
 # ---- F1: 非 git 目录 ----
 p="$OUT_DIR/F1-nongit"
@@ -426,6 +426,95 @@ git -C "$p" merge -q --no-ff feature/merged -m 'merge feature/merged' >/dev/null
 git -C "$p" config color.ui always >/dev/null 2>&1
 set_fake_remote "$p" 'https://127.0.0.1:1/github.com/team/color.git'
 register_fixture 'F14' 'color injection' "$p" 'local_merged_candidates should include feature/merged'
+
+# ---- F15: vendor 未被 .gitignore 排除 ----
+p="$OUT_DIR/F15-vendor-unignored"
+init_repo "$p"
+write_file "$p/package.json" '{ "name": "vu", "version": "1.0.0" }'
+# 关键：vendor 不在 .gitignore 里 —— 只靠 --exclude-standard 挡不住它，必须靠硬编码路径段排除
+write_file "$p/vendor/sub/Cargo.toml" '[package]
+name="vendored"
+version="9.9.9"
+'
+write_file "$p/README.md" '# vu
+'
+add_commit "$p" 'feat: vendored tree not ignored'
+set_fake_remote "$p" 'https://127.0.0.1:1/github.com/team/vu.git'
+register_fixture 'F15' 'vendor/ NOT ignored' "$p" 'vendor/sub/Cargo.toml is tracked; hardcoded exclusion must still drop it'
+
+# ---- F16: Cargo workspace 版本继承 ----
+p="$OUT_DIR/F16-cargo-workspace"
+init_repo "$p"
+write_file "$p/Cargo.toml" '[workspace]
+members = ["packages/a", "packages/b"]
+
+[workspace.package]
+version = "2.0.0"
+edition = "2021"
+'
+# 成员两种写法都要识别：点号键 与 内联表
+write_file "$p/packages/a/Cargo.toml" '[package]
+name = "a"
+version.workspace = true
+edition.workspace = true
+'
+write_file "$p/packages/b/Cargo.toml" '[package]
+name = "b"
+version = { workspace = true }
+edition.workspace = true
+'
+write_file "$p/README.md" '# ws
+'
+add_commit "$p" 'feat: cargo workspace'
+set_fake_remote "$p" 'https://127.0.0.1:1/github.com/team/ws.git'
+register_fixture 'F16' 'cargo workspace inheritance' "$p" 'inherited_version_files>=2; packages=[packages/a,packages/b]; member versions must NOT enter version_files'
+
+# ---- F17: cleanup.protect 多值 ----
+p="$OUT_DIR/F17-protect-config"
+init_repo "$p"
+write_file "$p/package.json" '{ "name": "pc", "version": "1.0.0" }'
+write_file "$p/README.md" '# pc
+'
+add_commit "$p" 'feat: protect config'
+# 三个值：--get-all 全回；--get 只回最后一个（zeta/*）。若实现误用 --get，
+# hotfix/* 会消失（release/* 会因内置字面量而假通过），故 hotfix/* 是关键判别项。
+git -C "$p" config --add cleanup.protect 'release/*' >/dev/null 2>&1
+git -C "$p" config --add cleanup.protect 'hotfix/*' >/dev/null 2>&1
+git -C "$p" config --add cleanup.protect 'zeta/*' >/dev/null 2>&1
+set_fake_remote "$p" 'https://127.0.0.1:1/github.com/team/pc.git'
+register_fixture 'F17' 'cleanup.protect multi-value' "$p" 'protected must contain every --get-all value'
+
+# ---- F18: 本地/远程合并基准分离 ----
+p="$OUT_DIR/F18-merge-base-split"
+init_repo "$p"
+write_file "$p/a.txt" 'base
+'
+add_commit "$p" 'feat: base'
+BASE_SHA=$(git -C "$p" rev-parse HEAD 2>/dev/null | tr -d '\r\n')
+git -C "$p" checkout -q -b feature >/dev/null 2>&1
+write_file "$p/a.txt" 'base
+feature
+'
+add_commit "$p" 'feat: feature work'
+FEAT_SHA=$(git -C "$p" rev-parse HEAD 2>/dev/null | tr -d '\r\n')
+git -C "$p" checkout -q main >/dev/null 2>&1
+git -C "$p" merge -q --no-ff feature -m 'merge feature' >/dev/null 2>&1
+# 伪造一个「落后」的 origin/main：本地已合并 feature，远程还停在合并前
+git -C "$p" remote add origin 'https://127.0.0.1:1/github.com/team/split.git' >/dev/null 2>&1
+git -C "$p" update-ref refs/remotes/origin/main "$BASE_SHA" >/dev/null 2>&1
+git -C "$p" update-ref refs/remotes/origin/feature "$FEAT_SHA" >/dev/null 2>&1
+git -C "$p" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main >/dev/null 2>&1
+register_fixture 'F18' 'local main merged, origin/main stale' "$p" 'local base=main (feature merged); remote base=origin/main (feature NOT merged)'
+
+# ---- F19: 有 remote 但无 origin/<default> ----
+p="$OUT_DIR/F19-base-unverified"
+init_repo "$p"
+write_file "$p/a.txt" 'base
+'
+add_commit "$p" 'feat: base'
+# 有 remote，但没有 refs/remotes/origin/<default> —— 远程基准无从验证
+git -C "$p" remote add origin 'https://127.0.0.1:1/github.com/team/nobase.git' >/dev/null 2>&1
+register_fixture 'F19' 'remote without origin/<default>' "$p" 'remote_base_unverified=true + remote-base-unverified warning'
 
 # ============ 输出 ============
 COUNT=${#IDS[@]}

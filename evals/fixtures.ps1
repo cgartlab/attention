@@ -1,7 +1,7 @@
 #Requires -Version 7.0
 <#
 .SYNOPSIS
-  生成 attention 采集脚本的 14 个测试 fixture（F1-F14）。
+  生成 attention 采集脚本的 19 个测试 fixture（F1-F19）。
 .DESCRIPTION
   契约见 references/scan-recipes.md；断言表见 evals/script-assertions.json。
   生成目录默认在系统临时目录下的 attention-evals/（可用 -OutDir 覆盖）。
@@ -218,6 +218,61 @@ Add-Commit -Repo $p -Message 'feat: merged work'
 & git -C $p config color.ui always 2>&1 | Out-Null
 Set-FakeRemote -Repo $p -Url 'https://127.0.0.1:1/github.com/team/color.git'
 Register-Fixture 'F14' 'color injection' $p 'local_merged_candidates should include feature/merged'
+
+$p = New-FixtureRepo 'F15-vendor-unignored'
+Set-FileContent -Path (Join-Path $p 'package.json') -Content '{ "name": "vu", "version": "1.0.0" }'
+# 关键：vendor 不在 .gitignore 里 —— 只靠 --exclude-standard 挡不住它，必须靠硬编码路径段排除
+Set-FileContent -Path (Join-Path $p 'vendor/sub/Cargo.toml') -Content "[package]`nname=`"vendored`"`nversion=`"9.9.9`"`n"
+Set-FileContent -Path (Join-Path $p 'README.md') -Content "# vu`n"
+Add-Commit -Repo $p -Message 'feat: vendored tree not ignored'
+Set-FakeRemote -Repo $p -Url 'https://127.0.0.1:1/github.com/team/vu.git'
+Register-Fixture 'F15' 'vendor/ NOT ignored' $p 'vendor/sub/Cargo.toml is tracked; hardcoded exclusion must still drop it'
+
+$p = New-FixtureRepo 'F16-cargo-workspace'
+Set-FileContent -Path (Join-Path $p 'Cargo.toml') -Content "[workspace]`nmembers = [`"packages/a`", `"packages/b`"]`n`n[workspace.package]`nversion = `"2.0.0`"`nedition = `"2021`"`n"
+# 成员两种写法都要识别：点号键 与 内联表
+Set-FileContent -Path (Join-Path $p 'packages/a/Cargo.toml') -Content "[package]`nname = `"a`"`nversion.workspace = true`nedition.workspace = true`n"
+Set-FileContent -Path (Join-Path $p 'packages/b/Cargo.toml') -Content "[package]`nname = `"b`"`nversion = { workspace = true }`nedition.workspace = true`n"
+Set-FileContent -Path (Join-Path $p 'README.md') -Content "# ws`n"
+Add-Commit -Repo $p -Message 'feat: cargo workspace'
+Set-FakeRemote -Repo $p -Url 'https://127.0.0.1:1/github.com/team/ws.git'
+Register-Fixture 'F16' 'cargo workspace inheritance' $p 'inherited_version_files>=2; packages=[packages/a,packages/b]; member versions must NOT enter version_files'
+
+$p = New-FixtureRepo 'F17-protect-config'
+Set-FileContent -Path (Join-Path $p 'package.json') -Content '{ "name": "pc", "version": "1.0.0" }'
+Set-FileContent -Path (Join-Path $p 'README.md') -Content "# pc`n"
+Add-Commit -Repo $p -Message 'feat: protect config'
+# 三个值：--get-all 全回；--get 只回最后一个（zeta/*）。若实现误用 --get，
+# hotfix/* 会消失（release/* 会因内置字面量而假通过），故 hotfix/* 是关键判别项。
+& git -C $p config --add cleanup.protect 'release/*' 2>&1 | Out-Null
+& git -C $p config --add cleanup.protect 'hotfix/*' 2>&1 | Out-Null
+& git -C $p config --add cleanup.protect 'zeta/*' 2>&1 | Out-Null
+Set-FakeRemote -Repo $p -Url 'https://127.0.0.1:1/github.com/team/pc.git'
+Register-Fixture 'F17' 'cleanup.protect multi-value' $p 'protected must contain every --get-all value'
+
+$p = New-FixtureRepo 'F18-merge-base-split'
+Set-FileContent -Path (Join-Path $p 'a.txt') -Content "base`n"
+Add-Commit -Repo $p -Message 'feat: base'
+$baseSha = (& git -C $p rev-parse HEAD).Trim()
+& git -C $p checkout -q -b feature 2>&1 | Out-Null
+Set-FileContent -Path (Join-Path $p 'a.txt') -Content "base`nfeature`n"
+Add-Commit -Repo $p -Message 'feat: feature work'
+$featSha = (& git -C $p rev-parse HEAD).Trim()
+& git -C $p checkout -q main 2>&1 | Out-Null
+& git -C $p merge -q --no-ff feature -m 'merge feature' 2>&1 | Out-Null
+# 伪造一个"落后"的 origin/main：本地已合并 feature，远程还停在合并前
+& git -C $p remote add origin 'https://127.0.0.1:1/github.com/team/split.git' 2>&1 | Out-Null
+& git -C $p update-ref refs/remotes/origin/main $baseSha 2>&1 | Out-Null
+& git -C $p update-ref refs/remotes/origin/feature $featSha 2>&1 | Out-Null
+& git -C $p symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main 2>&1 | Out-Null
+Register-Fixture 'F18' 'local main merged, origin/main stale' $p 'local base=main (feature merged); remote base=origin/main (feature NOT merged)'
+
+$p = New-FixtureRepo 'F19-base-unverified'
+Set-FileContent -Path (Join-Path $p 'a.txt') -Content "base`n"
+Add-Commit -Repo $p -Message 'feat: base'
+# 有 remote，但没有 refs/remotes/origin/<default> —— 远程基准无从验证
+& git -C $p remote add origin 'https://127.0.0.1:1/github.com/team/nobase.git' 2>&1 | Out-Null
+Register-Fixture 'F19' 'remote without origin/<default>' $p 'remote_base_unverified=true + remote-base-unverified warning'
 
 $summary = [pscustomobject]@{
   out_dir  = $OutDir

@@ -439,6 +439,300 @@
       "path": "recent_changed_files",
       "op": "is_nonempty_array",
       "note": "提交数<=10 的仓库不得因 HEAD~n 不存在而变空"
+    },
+    {
+      "id": "F6-remote-tip-sha",
+      "fixtures": [
+        "F6"
+      ],
+      "script": "branch_cleanup_audit",
+      "impl": "*",
+      "path": "remote_merged_candidates[].tip_sha",
+      "op": "matches",
+      "value": "^[0-9a-f]{7,40}$",
+      "note": "远程候选必须带 tip_sha（删除时作 --force-with-lease 期望值；字段缺失或 null 都判失败）"
+    },
+    {
+      "id": "F15-vendor-file",
+      "fixtures": [
+        "F15"
+      ],
+      "script": "version_consistency_audit",
+      "impl": "*",
+      "path": "version_files[].file",
+      "op": "not_contains",
+      "value": "vendor",
+      "note": "vendor 未被 .gitignore 排除时仍必须靠硬编码路径段排除（第三方内嵌清单不是自有版本文件）"
+    },
+    {
+      "id": "F15-consistent",
+      "fixtures": [
+        "F15"
+      ],
+      "script": "version_consistency_audit",
+      "impl": "*",
+      "path": "consistent",
+      "op": "is_true",
+      "note": "只剩 package.json 1.0.0，不得因 vendor/sub/Cargo.toml 9.9.9 报假不一致"
+    },
+    {
+      "id": "F16-inherited-count",
+      "fixtures": [
+        "F16"
+      ],
+      "script": "version_consistency_audit",
+      "impl": "*",
+      "path": "inherited_version_files",
+      "op": "count_gte",
+      "value": 2,
+      "note": "两个 Cargo workspace 成员的 version.workspace=true 都必须被识别，不得静默漏掉"
+    },
+    {
+      "id": "F16-inherited-from",
+      "fixtures": [
+        "F16"
+      ],
+      "script": "version_consistency_audit",
+      "impl": "*",
+      "path": "inherited_version_files[].inherits_from",
+      "op": "contains",
+      "value": "Cargo.toml",
+      "note": "inherits_from 必须指向提供版本的根清单"
+    },
+    {
+      "id": "F16-vf-root",
+      "fixtures": [
+        "F16"
+      ],
+      "script": "version_consistency_audit",
+      "impl": "*",
+      "path": "version_files[].version",
+      "op": "contains",
+      "value": "2.0.0",
+      "note": "版本来自根 [workspace.package]"
+    },
+    {
+      "id": "F16-inherited-not-in-vf",
+      "fixtures": [
+        "F16"
+      ],
+      "script": "version_consistency_audit",
+      "impl": "*",
+      "path": "version_files[].file",
+      "op": "not_contains",
+      "value": "packages/",
+      "note": "继承版本的文件不得进入 version_files（否则凭空多出一个空版本）"
+    },
+    {
+      "id": "F16-consistent",
+      "fixtures": [
+        "F16"
+      ],
+      "script": "version_consistency_audit",
+      "impl": "*",
+      "path": "consistent",
+      "op": "is_true"
+    },
+    {
+      "id": "F16-packages-a",
+      "fixtures": [
+        "F16"
+      ],
+      "script": "version_consistency_audit",
+      "impl": "*",
+      "path": "packages",
+      "op": "contains",
+      "value": "packages/a",
+      "note": "packages 必须真正填充（此前恒为 []）"
+    },
+    {
+      "id": "F16-packages-b",
+      "fixtures": [
+        "F16"
+      ],
+      "script": "version_consistency_audit",
+      "impl": "*",
+      "path": "packages",
+      "op": "contains",
+      "value": "packages/b"
+    },
+    {
+      "id": "F16-monorepo",
+      "fixtures": [
+        "F16"
+      ],
+      "script": "version_consistency_audit",
+      "impl": "*",
+      "path": "monorepo_mode",
+      "op": "is_true"
+    },
+    {
+      "id": "F17-protect-hotfix",
+      "fixtures": [
+        "F17"
+      ],
+      "script": "branch_cleanup_audit",
+      "impl": "*",
+      "path": "protected",
+      "op": "contains",
+      "value": "hotfix/*",
+      "note": "必须用 git config --get-all（--get 只回最后一个，hotfix/* 会丢）"
+    },
+    {
+      "id": "F17-protect-release",
+      "fixtures": [
+        "F17"
+      ],
+      "script": "branch_cleanup_audit",
+      "impl": "*",
+      "path": "protected",
+      "op": "contains",
+      "value": "release/*"
+    },
+    {
+      "id": "F17-protect-zeta",
+      "fixtures": [
+        "F17"
+      ],
+      "script": "branch_cleanup_audit",
+      "impl": "*",
+      "path": "protected",
+      "op": "contains",
+      "value": "zeta/*"
+    },
+    {
+      "id": "F17-protect-unique",
+      "fixtures": [
+        "F17"
+      ],
+      "script": "branch_cleanup_audit",
+      "impl": "*",
+      "path": "protected",
+      "op": "unique_array",
+      "note": "内置名单与 config 值可能重复，必须去重"
+    },
+    {
+      "id": "F18-local-base",
+      "fixtures": [
+        "F18"
+      ],
+      "script": "branch_cleanup_audit",
+      "impl": "*",
+      "path": "local_merge_base",
+      "op": "equals",
+      "value": "main",
+      "note": "本地合并基准必须是本地默认分支，不是 origin/<default>"
+    },
+    {
+      "id": "F18-local-candidate",
+      "fixtures": [
+        "F18"
+      ],
+      "script": "branch_cleanup_audit",
+      "impl": "*",
+      "path": "local_merged_candidates",
+      "op": "contains",
+      "value": "feature",
+      "note": "本地已合并但未推送时不得漏报（用 origin/main 作基准就是假阴性）"
+    },
+    {
+      "id": "F18-remote-base",
+      "fixtures": [
+        "F18"
+      ],
+      "script": "branch_cleanup_audit",
+      "impl": "*",
+      "path": "remote_merge_base",
+      "op": "equals",
+      "value": "origin/main"
+    },
+    {
+      "id": "F18-remote-not-merged",
+      "fixtures": [
+        "F18"
+      ],
+      "script": "branch_cleanup_audit",
+      "impl": "*",
+      "path": "remote_merged_candidates",
+      "op": "is_empty_array",
+      "note": "远程基准停在合并前，故 feature 在远程侧不算已合并（用本地 main 判就会误删远程分支）"
+    },
+    {
+      "id": "F18-unverified-false",
+      "fixtures": [
+        "F18"
+      ],
+      "script": "branch_cleanup_audit",
+      "impl": "*",
+      "path": "remote_base_unverified",
+      "op": "is_false"
+    },
+    {
+      "id": "F18-rulesets-empty",
+      "fixtures": [
+        "F18"
+      ],
+      "script": "branch_cleanup_audit",
+      "impl": "*",
+      "path": "protected_from_rulesets",
+      "op": "is_empty_array",
+      "note": "宿主非 GitHub（127.0.0.1）→ 静默降级为空数组"
+    },
+    {
+      "id": "F18-rulesets-warning",
+      "fixtures": [
+        "F18"
+      ],
+      "script": "branch_cleanup_audit",
+      "impl": "*",
+      "path": "warnings",
+      "op": "contains",
+      "value": "rulesets-unavailable",
+      "note": "「没查成」必须留痕：查不到保护分支不得当成没有保护分支"
+    },
+    {
+      "id": "F19-unverified-true",
+      "fixtures": [
+        "F19"
+      ],
+      "script": "branch_cleanup_audit",
+      "impl": "*",
+      "path": "remote_base_unverified",
+      "op": "is_true",
+      "note": "origin/<default> 不存在 → 远程基准未验证"
+    },
+    {
+      "id": "F19-warning",
+      "fixtures": [
+        "F19"
+      ],
+      "script": "branch_cleanup_audit",
+      "impl": "*",
+      "path": "warnings",
+      "op": "contains",
+      "value": "remote-base-unverified"
+    },
+    {
+      "id": "F19-remote-base-null",
+      "fixtures": [
+        "F19"
+      ],
+      "script": "branch_cleanup_audit",
+      "impl": "*",
+      "path": "remote_merge_base",
+      "op": "is_null"
+    },
+    {
+      "id": "F19-local-base",
+      "fixtures": [
+        "F19"
+      ],
+      "script": "branch_cleanup_audit",
+      "impl": "*",
+      "path": "local_merge_base",
+      "op": "equals",
+      "value": "main",
+      "note": "本地基准不受远程缺失影响"
     }
   ]
 }
