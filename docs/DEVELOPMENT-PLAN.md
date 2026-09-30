@@ -3,6 +3,14 @@
 > 目标：让立正成为**任意 harness / Agent 环境**都能用的 Git 项目巡检与修复 skill——不绑定某一操作系统、某一 shell、某一 harness。
 > 状态：v0.1.0（pwsh 脚本，已在 Windows/DSH 环境验证）；本计划目标是跨 harness 通用化（版本号贯穿保持 0.1.0，升 1.0 由用户定）。
 
+## 进度（截至本轮）
+
+- **P1 脚本解耦** ✅ 完成：bash(.sh) + pwsh(.ps1) 双实现 + `scan-recipes.md` 契约 + Phase 0 shell 探测；**bash 已在 git-bash 验证**（发现 `C:\Program Files\Git\bin\bash.exe`，5/5 smoke + parity）。
+- **P2 Agent Skills 对齐** ✅ 完成（文档/徽章/frontmatter）；安装验证（`npx skills add`）待推送 GitHub（用户暂不建远程）。
+- **P3 无脚本回退 + 依赖最小化** ✅ 完成。
+- **P4 跨 harness evals** ✅ 完成：bash + pwsh，5 脚本 parity 全过（见 `docs/VALIDATION.md`）。
+- **P5 通用化打磨** 🔶 部分：多宿主 PR / missing_core_docs / AGENTS.md / smoke_test 已完成；i18n / CONTRIBUTING / 更多版本生态 待定。
+- 关键里程碑：第 5 轮发现本环境自带 git-bash，使 P1 bash 验证与 P4 parity 成为可能；第 6 轮深度 parity 抓到 next_steps.sh 一个真 bug 并修。
 ## 一、调研发现（GitHub 类似 skill 与可移植性信号）
 
 | 仓库 | 语言 | 教给立正什么 |
