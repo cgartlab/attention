@@ -8,21 +8,26 @@
 
 ### Added
 - **P1 脚本解耦**：scripts/ 新增 bash（.sh）实现，与 PowerShell（.ps1）并行，覆盖 5 个采集脚本 + 共享助手 `scripts/_lib.sh`（无 bash-4 特性，兼容 macOS bash 3.2；GNU/BSD date）。
-- `references/scan-recipes.md`：5 个脚本的 git 命令配方 + JSON 契约（单一事实源），.sh 与 .ps1 都照此对齐。
+- `references/scan-recipes.md`：5 个脚本的 git 命令配方 + JSON 契约（单一事实源），.sh 与 .ps1 都照此对齐；含无脚本回退 3 步流程与依赖边界审计。
 - `references/environment-and-prereqs.md` §6：Phase 0 shell 探测与路径选择（bash→.sh / pwsh→.ps1 / 无脚本回退）。
-- `docs/DEVELOPMENT-PLAN.md`：跨 harness 通用化开发计划。
+- `docs/DEVELOPMENT-PLAN.md`：跨 harness 通用化开发计划（P1–P5，版本贯穿保持 0.1.0）。
 - 默认分支 master -> main。
 - **P2 Agent Skills 标准对齐**：README 增加 `npx skills add cgartlab/lizheng` 安装路径与 skills.sh / Agent Skills 兼容徽章；确认 frontmatter（name+description）符合开放标准。
+- **P5 多宿主 PR 指引**：`references/pr-and-remote-hosts.md` 扩为按宿主给真实 CLI + Web 回退——GitLab(`glab mr`)、Gitea/Codeberg(`tea pulls`)、Azure DevOps(`az repos pr`)、Bitbucket(Web)，不编造命令。
+- **新能力 missing_core_docs**：`next_steps_analysis` 增加 `missing_core_docs` 信号，检测期望核心文档（README/CHANGELOG/LICENSE/AGENTS/CONTRIBUTING）中无匹配顶层文件者，让它出现在下一步建议里（.ps1 + .sh + scan-recipes 契约成对更新）。
+- `AGENTS.md`：机器面 repo 指引（脚本黑盒/安全分层/报告大白话/版本策略/成对改脚本/自检），已被系统识别为 workspace 指令。
+- `scripts/smoke_test.ps1` + `scripts/smoke_test.sh`：一键冒烟回归检查（跑 5 个采集脚本、验合法 JSON），pwsh 与 bash 成对；AGENTS.md 自检指向它。
 
 ### Changed
 - 收尾报告改用大白话：主叙事面向项目作者（含刚入行的开发者），禁止字段名 / 命令串 / JSON 键进入主叙事，原始技术信号另放末尾"📋 技术细节（可选）"小节，主叙事必须能独立读懂。SKILL.md 的 Phase 4 新增"报告语言原则"小节并说明原因。
 
 ### Fixed
-- TODO 扫描排除自身源文件（scripts/next_steps_analysis.ps1 与 .sh），消除自指假阳性。
+- TODO 扫描排除自身源文件（`scripts/next_steps_analysis.ps1` 与 `.sh`），消除自指假阳性（dogfood 发现 P1 引入 .sh 后 .ps1 只排除 .ps1 导致自指 .sh，已修：两变体都排除两文件）。
+- `AGENTS.md` 自检行更新此前因 `-like` 用半角冒号而行用全角冒号静默未生效，已用字面 .Replace 修正并指向 smoke_test。
 
 ### Notes
-- bash（.sh）实现未在本环境验证（无 bash）；待有 bash 的环境实跑确认契约一致。
-- `npx skills add` 安装路径需仓库推送到 GitHub 后方可验证；当前未推送（按计划推迟建远程）。
+- bash（.sh）实现未在本环境验证（无 bash）；现可用 `bash scripts/smoke_test.sh --repo <path>` 一键验证，待有 bash 的环境实跑。
+- `npx skills add cgartlab/lizheng` 安装路径需仓库推送到 GitHub 后方可验证；当前未推送（按计划推迟建远程）。
 
 ## [0.1.0] - 2026-09-29
 
