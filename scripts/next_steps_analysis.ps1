@@ -109,6 +109,10 @@ if ($default) {
   }
 }
 
+$missing = @()
+foreach ($e in 'README','CHANGELOG','LICENSE','AGENTS','CONTRIBUTING') {
+  if (-not (Get-ChildItem -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -like "$e*" })) { $missing += $e }
+}
 $result = [ordered]@{
   is_git          = $true
   default_branch  = $default
@@ -121,5 +125,6 @@ $result = [ordered]@{
   todo_fixme      = $todos
   branches        = $branches
   test_commands   = $testCmds
+  missing_core_docs = $missing
 }
 Write-Output (ConvertTo-Json -Depth 8 $result)

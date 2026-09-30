@@ -79,7 +79,7 @@
 - `git for-each-ref --format='%(refname:short)%09%(committerdate:iso-strict)' refs/heads` → branches `[{branch,last_commit}]`
 - test_commands：`package.json` scripts 的 test/lint/build/check/typecheck/format → `{name,script}`；Makefile 目标 test/lint/build/check → `make <t>`；pyproject.toml 含 pytest/ruff/mypy → 该名
 - behind_default：origin/<default> 存在则 `git rev-list --count origin/<default>..HEAD`
-**JSON**：`{is_git(bool), default_branch(str|null), behind_default(int|null), recent_commits(str[]), is_github(bool), gh_authed(bool), open_issues(str[]), open_prs(str[]), todo_fixme(str[]), branches([{branch,last_commit}]), test_commands([{name,script}])}`
+**JSON**：`{is_git(bool), default_branch(str|null), behind_default(int|null), recent_commits(str[]), is_github(bool), gh_authed(bool), open_issues(str[]), open_prs(str[]), todo_fixme(str[]), branches([{branch,last_commit}]), test_commands([{name,script}]), missing_core_docs(str[])`
 
 ## 无脚本回退用法（P3）
 
