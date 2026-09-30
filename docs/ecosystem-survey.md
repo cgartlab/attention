@@ -1,8 +1,13 @@
-﻿# 生态调研：GitHub 上与立正（attention）功能相近的 Skill 与工具
+# 生态调研：GitHub 上与立正（attention）功能相近的 Skill 与工具
 
 > 调研日期：2026-09-30
 > 调研对象：立正Skill（attention）的功能邻近生态——同类 Agent Skill、分支清理 CLI、版本/CHANGELOG 自动化工具、提交前守门工具链。
 > 结论定位：不是竞品清单，而是回答三个问题——**谁在做同样的事 / 谁在立正的边界外做得好 / 立正自己有哪些已被证实的缺陷**。
+>
+> **⚠️ 勘误指针（2026-10-01）**：本文有两条结论已被后续**独立复核与真实实验推翻**，请以 `docs/research/p2-verification.md` 为准——
+> ① §4.1/§4.2/§8-P2-10 的 patch-id 口径（"topic 整段 vs main 逐 commit"）**只对 squash 有效，对多 commit rebase 永远匹配不上**，正确口径是两侧都逐 commit；
+> ② §4.5/P1-6 的 rulesets 用法（在 `rulesets` 列表里找 `rules[].type=="deletion"`）**取不到数据**，正确端点是 `GET /repos/{o}/{r}/rules/branches/{branch}`。
+> 另有 §6.3 关于 workflow/job 级 skip 的表述方向写反，也已在该文档中更正。本文正文**保留原样**以维持调研的可追溯性。
 
 ---
 
