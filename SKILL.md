@@ -39,6 +39,7 @@ metadata:
 3. **远程宿主**：GitHub（用 gh，PR 全功能）/ GitLab·Bitbucket·其它（remote -v 识别，PR 降级为"PR 就绪 diff + 手动指引"）。
 4. **gh 鉴权**：gh auth status 未登录 → 标记 PR 功能不可用，其余流程照常。
 5. **项目画像**：项目类型、核心文档集、版本承载文件、提交规约（读 git log 判定是否 conventional commits）、测试/lint/build 命令（package.json scripts / Makefile / pyproject 等）。
+6. **shell 探测**：bash 可用 → 用 .sh；否则 pwsh 可用 → 用 .ps1；否则无脚本回退（按 references/scan-recipes.md 配方直接跑 git）。细则见 environment-and-prereqs.md §6。
 
 > 为什么要先探测：默认分支不是想当然的 main，远程宿主决定 PR 怎么开，gh 没登录不能硬开 PR。把这些不确定一次性钉死，后面的判断才稳。
 
