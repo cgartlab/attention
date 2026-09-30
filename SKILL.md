@@ -165,6 +165,7 @@ Phase 4 收尾报告（含可发布判定）
 | `references/version-file-inventory.md` | 版本文件与 lockfile 的跨生态详表（判断"还有哪个文件要同步"时读） |
 | `references/pr-and-remote-hosts.md` | gh PR 模板、非 GitHub 与远程不可达的降级 |
 | `references/autonomy-and-safety.md` | 分层确认模型、禁止动作、边界情况 |
+| `references/common-pitfalls.md` | "做了但没生效"类问题（.gitignore 前导斜杠/对已跟踪文件无效/`check-ignore` 陷阱）：判断"某个文件会不会被提交"时读 |
 | `docs/ecosystem-research/` 与 `docs/ecosystem-survey.md` | **研究备忘，非默认加载**：发布自动化、分支清理、相邻 skill 生态的调研。只在需要对齐行业做法或判断字段边界时读 |
 
 ## assets/templates 索引
