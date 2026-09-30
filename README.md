@@ -51,7 +51,7 @@ attention/
 ├── scripts/            # 黑盒采集脚本：bash(.sh) 与 PowerShell(.ps1) 两套
 ├── references/         # 按需加载的判断细则（含 scan-recipes.md 契约）
 ├── assets/templates/   # 提交/PR/CHANGELOG/计划表/报告模板
-├── evals/              # 回归：14 个 fixture + 断言表 + 双实现 runner
+├── evals/              # 回归：19 个 fixture + 断言表 + 双实现 runner
 └── docs/               # 验证记录、质量审计、调研备忘
 ```
 
@@ -80,7 +80,7 @@ attention/
 仓库自带可复现的回归，不靠"人肉记得跑"：
 
 ```powershell
-# 三层校验：严格 JSON（RFC 8259）+ .sh/.ps1 逐字段 parity + 断言表（14 个 fixture、38 条断言）
+# 三层校验：严格 JSON（RFC 8259）+ .sh/.ps1 逐字段 parity + 断言表（19 个 fixture、65 条断言）
 pwsh -NoProfile -File evals/run_evals.ps1
 bash evals/run_evals.sh                 # bash 侧（建议有 python3）
 
@@ -93,7 +93,7 @@ bash scripts/smoke_test.sh --repo .
 
 **已验证 / 未验证（诚实边界）**：
 
-- ✅ 已验证：双实现在 14 个 fixture 上输出严格合法 JSON 且逐字段一致；非 git 目录、零提交仓库、detached HEAD、CRLF 版本文件、被忽略目录内的版本文件、宿主误判、颜色注入等边界；`--repo` 无效与漏值不再静默/挂死。
+- ✅ 已验证：双实现在 19 个 fixture 上输出严格合法 JSON 且逐字段一致；非 git 目录、零提交仓库、detached HEAD、CRLF 版本文件、被忽略目录内的版本文件、宿主误判、颜色注入等边界；`--repo` 无效与漏值不再静默/挂死。
 - ❌ 未验证：**任何远程操作**（本开发环境无法建立可用的远程传输：本地路径传输要过 shell、`git://` receive-pack 会挂死）；真实 GitHub PR 创建；`npx skills add` 安装链路（需先推送）；跨 harness 触发率。
 
 详见 `docs/VALIDATION.md`（验证记录）与 `docs/QUALITY-AUDIT.md`（本次审计查出的缺陷、复现方式与回归清单）。

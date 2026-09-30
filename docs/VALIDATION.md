@@ -32,22 +32,40 @@ bash scripts/smoke_test.sh --repo .
 
 | 校验 | 命令 | 结果 |
 |---|---|---|
-| 三层校验（pwsh 侧 runner） | `pwsh -NoProfile -File evals/run_evals.ps1` | **366 passed / 0 failed / 366** |
-| 三层校验（bash 侧 runner，独立实现） | `bash evals/run_evals.sh` | **366 passed / 0 failed / 366** |
+| 三层校验（pwsh 侧 runner） | `pwsh -NoProfile -File evals/run_evals.ps1` | **493 passed / 0 failed / 493** |
+| 三层校验（bash 侧 runner，独立实现） | `bash evals/run_evals.sh` | **493 passed / 0 failed / 493** |
 | 快速冒烟（双实现 + 负例） | `pwsh …/smoke_test.ps1 --repo .` | 5 passed / 0 failed |
 | 快速冒烟（bash） | `bash …/smoke_test.sh --repo .` | 5 passed / 0 failed |
 | `--repo` 无效 | `… --repo <不存在>` | 两实现均 `[FAIL] --repo path not found`、退出 1（**不再静默分析当前目录**） |
 
-**三层校验**：① 严格 JSON——`System.Text.Json` / python `json.load` 解析，拒绝字符串内裸控制字符；② parity——同 fixture、同参数下 `.sh` 与 `.ps1` 的**字段集与逐字段值**必须一致（路径形态、数组顺序、`null` vs `[]` 全算差异）；③ 断言表——`evals/script-assertions.json`（40 条）。
+**三层校验**：① 严格 JSON——`System.Text.Json` / python `json.load` 解析，拒绝字符串内裸控制字符；② parity——同 fixture、同参数下 `.sh` 与 `.ps1` 的**字段集与逐字段值**必须一致（路径形态、数组顺序、`null` vs `[]` 全算差异）；③ 断言表——`evals/script-assertions.json`（65 条）。
 
 **改前基线（同一套断言、原始脚本）**：用 `git worktree add --detach <path> HEAD` 取未修改的脚本，把 `evals/` 复制进去，跑**同一个 runner 与同一份断言表**：
 
 | 状态 | 结果 | 证据文件 |
 |---|---|---|
 | 改前（原始 HEAD `ef75840`） | 260 passed / **106 failed** / 366 | `evals/results/20260930-233235-ef75840-BASELINE-head.json` |
-| 改后（当前工作树） | **366 passed / 0 failed** / 366 | `evals/results/20260930-230925-ef75840.json`（pwsh 侧）、`…231506…`（bash 侧） |
+| 改后（P6 完成时） | **366 passed / 0 failed** / 366 | `evals/results/20260930-230925-ef75840.json`（pwsh 侧）、`…231506…`（bash 侧） |
 
 失败项与 `docs/QUALITY-AUDIT.md` 的缺陷清单一一对应（严格 JSON、parity 路径形态、缺失新字段、`release_violved` 两实现取值不同、`vendor/` 泄漏、宿主误判、颜色注入、`--repo` 无效时返回当前仓库数据、漏值挂死、`protected` 重复等）。这是本技能第一次有**同一批断言**支撑的"红→绿"证据。
+
+### 第二轮（P0/P1 落地：基准分离、Cargo 继承、vendor 排除、gh rules、lease）
+
+| 阶段 | 结果 | 说明 |
+|---|---|---|
+| 只加 fixture + 断言（先红） | 455 passed / **36 failed** / 491 | 36 = 18 条新断言 × 2 实现；F1–F14 既有断言无一变红（未削弱任何一条） |
+| 批次 A（`branch_cleanup_audit`） | 479 / **12** / 491 | 本地/远程合并基准分离 + 基准守卫 + `cleanup.protect` + `gh rules` |
+| 终态（+ 版本改造、`tip_sha`、端点纠偏） | **493 / 0 / 493** | pwsh 与 bash 两套 runner 结果一致 |
+
+本轮修正的是一处**由 P6 引入的回归**：P6 把"本地合并判定"也改用了 `origin/<默认分支>`，导致"本地已合并、尚未推送"的分支被**漏报成空集**（假阴性）。现在本地用本地默认分支、远程用 `origin/<默认分支>` 并加基准守卫（`remote_base_unverified` + 警告）。F18/F19 覆盖这两个方向。
+
+**本轮的实测性证据（非文档推断）**：
+- `gh` 端点纠偏：`GET /rulesets` 列表**不含** `rules`/`conditions`（实测只回 `id/name/target/enforcement/source/node_id/created_at/updated_at/_links`）；正确端点是 `GET /repos/{o}/{r}/rules/branches/{branch}`，实测 `any(.[]; .type=="deletion")` 在 `nodejs/node` 的 `main` 上为 true；**分支不存在时返回 `[]` + HTTP 200**（陷阱）。活体端到端：临时仓库 remote 指向真实 `nodejs/node`，两套实现同形输出 `protected_from_rulesets=["main","v22.x"]`。
+- 远程删除必须带 lease：`git push origin --force-with-lease=<branch>:<sha> --delete <branch>`；**不带 lease 的删除会静默丢掉确认窗口内他人推送的提交**（已用裸仓库 + 两个 clone 复现数据丢失）。
+- patch-id 口径纠偏：survey 的"topic 整段 vs main 逐 commit"**只对 squash 有效**，对多 commit rebase 永远匹配不上（实测交集为空，改成两侧逐 commit 后全部命中）；另实测 **cherry-pick 必然误报**，这才是"只报告不删"的真正理由。详见 `docs/research/p2-verification.md`。
+- `git branch -d` 与 `-D` 都拒绝删除被 worktree 检出的分支（故该检查属报告层改进，不是安全修复）。
+
+**实现坑（供后续维护者）**：pwsh 中 `function f { return ,$out }` 的调用处若再套 `@(...)`，会得到"只含一个数组元素"的嵌套数组（`Count=1`，元素被串成 `System.Object[]`），曾让 Cargo members 解析静默变空。
 
 ## 3. 断言覆盖的边界
 
