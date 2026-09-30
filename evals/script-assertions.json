@@ -1,0 +1,444 @@
+{
+  "version": 1,
+  "contract": "references/scan-recipes.md",
+  "ops": [
+    "strict_json",
+    "parity",
+    "is_true",
+    "is_false",
+    "is_null",
+    "is_empty_array",
+    "is_nonempty_array",
+    "equals",
+    "contains",
+    "not_contains",
+    "matches",
+    "count_gte",
+    "unique_array",
+    "raw_not_contains",
+    "no_hang"
+  ],
+  "note": "paths use dot notation; [] expands each element. Expected values describe TARGET (post-fix) behaviour, so this table is RED before Phase 2 fixes.",
+  "checks": [
+    {
+      "id": "all-strict-json",
+      "fixtures": "*",
+      "script": "*",
+      "impl": "*",
+      "op": "strict_json",
+      "note": "每个脚本在两套实现下都必须是严格合法 JSON（RFC 8259：字符串内不得有裸控制字符）"
+    },
+    {
+      "id": "all-parity",
+      "fixtures": "*",
+      "script": "*",
+      "impl": "*",
+      "op": "parity",
+      "note": "scan-recipes.md 承诺两套实现同形 JSON：字段集一致 + 逐字段值一致"
+    },
+    {
+      "id": "F1-notgit",
+      "fixtures": [
+        "F1"
+      ],
+      "script": "*",
+      "impl": "*",
+      "path": "is_git",
+      "op": "is_false"
+    },
+    {
+      "id": "F2-head-null",
+      "fixtures": [
+        "F2"
+      ],
+      "script": "git_state_snapshot",
+      "impl": "*",
+      "path": "head_short",
+      "op": "is_null"
+    },
+    {
+      "id": "F2-recent-empty",
+      "fixtures": [
+        "F2"
+      ],
+      "script": "git_state_snapshot",
+      "impl": "*",
+      "path": "recent_changed_files",
+      "op": "is_empty_array"
+    },
+    {
+      "id": "F3-detached",
+      "fixtures": [
+        "F3"
+      ],
+      "script": "git_state_snapshot",
+      "impl": "*",
+      "path": "detached",
+      "op": "is_true"
+    },
+    {
+      "id": "F3-branch-null",
+      "fixtures": [
+        "F3"
+      ],
+      "script": "git_state_snapshot",
+      "impl": "*",
+      "path": "current_branch",
+      "op": "is_null"
+    },
+    {
+      "id": "F4-vf-relative",
+      "fixtures": [
+        "F4"
+      ],
+      "script": "version_consistency_audit",
+      "impl": "*",
+      "path": "version_files[].file",
+      "op": "not_contains",
+      "value": "\\"
+    },
+    {
+      "id": "F4-crlf-value",
+      "fixtures": [
+        "F4"
+      ],
+      "script": "version_consistency_audit",
+      "impl": "*",
+      "path": "distinct_versions",
+      "op": "contains",
+      "value": "9.9.9"
+    },
+    {
+      "id": "F4-untracked-todo",
+      "fixtures": [
+        "F4"
+      ],
+      "script": "next_steps_analysis",
+      "impl": "*",
+      "path": "todo_fixme",
+      "op": "count_gte",
+      "value": 1
+    },
+    {
+      "id": "F5-dirty",
+      "fixtures": [
+        "F5"
+      ],
+      "script": "git_state_snapshot",
+      "impl": "*",
+      "path": "unstaged",
+      "op": "is_nonempty_array"
+    },
+    {
+      "id": "F5-untracked",
+      "fixtures": [
+        "F5"
+      ],
+      "script": "git_state_snapshot",
+      "impl": "*",
+      "path": "untracked",
+      "op": "is_nonempty_array"
+    },
+    {
+      "id": "F5-todo-untracked",
+      "fixtures": [
+        "F5"
+      ],
+      "script": "next_steps_analysis",
+      "impl": "*",
+      "path": "todo_fixme",
+      "op": "count_gte",
+      "value": 1
+    },
+    {
+      "id": "F6-merged",
+      "fixtures": [
+        "F6"
+      ],
+      "script": "branch_cleanup_audit",
+      "impl": "*",
+      "path": "local_merged_candidates",
+      "op": "contains",
+      "value": "feature/done"
+    },
+    {
+      "id": "F6-stale",
+      "fixtures": [
+        "F6"
+      ],
+      "script": "branch_cleanup_audit",
+      "impl": "*",
+      "path": "local_stale_unmerged_report[].branch",
+      "op": "contains",
+      "value": "feature/old"
+    },
+    {
+      "id": "F6-protected-unique",
+      "fixtures": [
+        "F6"
+      ],
+      "script": "branch_cleanup_audit",
+      "impl": "*",
+      "path": "protected",
+      "op": "unique_array"
+    },
+    {
+      "id": "F6-unpushed-branch",
+      "fixtures": [
+        "F6"
+      ],
+      "script": "git_state_snapshot",
+      "impl": "*",
+      "path": "unpushed_branches",
+      "op": "contains",
+      "value": "feature/old"
+    },
+    {
+      "id": "F7-inconsistent",
+      "fixtures": [
+        "F7"
+      ],
+      "script": "version_consistency_audit",
+      "impl": "*",
+      "path": "consistent",
+      "op": "is_false"
+    },
+    {
+      "id": "F7-distinct",
+      "fixtures": [
+        "F7"
+      ],
+      "script": "version_consistency_audit",
+      "impl": "*",
+      "path": "distinct_versions",
+      "op": "count_gte",
+      "value": 2
+    },
+    {
+      "id": "F7-signal-vf",
+      "fixtures": [
+        "F7"
+      ],
+      "script": "version_consistency_audit",
+      "impl": "*",
+      "path": "release_signals[].kind",
+      "op": "contains",
+      "value": "version-file-touched"
+    },
+    {
+      "id": "F8-version-clean",
+      "fixtures": [
+        "F8"
+      ],
+      "script": "version_consistency_audit",
+      "impl": "*",
+      "path": "version_files[].version",
+      "op": "matches",
+      "value": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    {
+      "id": "F9-top-version",
+      "fixtures": [
+        "F9"
+      ],
+      "script": "version_consistency_audit",
+      "impl": "*",
+      "path": "distinct_versions",
+      "op": "contains",
+      "value": "2.0.0"
+    },
+    {
+      "id": "F9-not-dep-version",
+      "fixtures": [
+        "F9"
+      ],
+      "script": "version_consistency_audit",
+      "impl": "*",
+      "path": "distinct_versions",
+      "op": "not_contains",
+      "value": "1.3.0"
+    },
+    {
+      "id": "F10-no-vendor",
+      "fixtures": [
+        "F10"
+      ],
+      "script": "version_consistency_audit",
+      "impl": "*",
+      "path": "version_files[].file",
+      "op": "not_contains",
+      "value": "vendor"
+    },
+    {
+      "id": "F10-consistent",
+      "fixtures": [
+        "F10"
+      ],
+      "script": "version_consistency_audit",
+      "impl": "*",
+      "path": "consistent",
+      "op": "is_true"
+    },
+    {
+      "id": "F11-not-github",
+      "fixtures": [
+        "F11"
+      ],
+      "script": "next_steps_analysis",
+      "impl": "*",
+      "path": "is_github",
+      "op": "is_false"
+    },
+    {
+      "id": "F11-mask-field",
+      "fixtures": [
+        "F11"
+      ],
+      "script": "next_steps_analysis",
+      "impl": "*",
+      "path": "remote_url_masked",
+      "op": "not_contains",
+      "value": "SUPERSECRETTOKEN"
+    },
+    {
+      "id": "F11-no-token-raw",
+      "fixtures": [
+        "F11"
+      ],
+      "script": "*",
+      "impl": "*",
+      "op": "raw_not_contains",
+      "value": "SUPERSECRETTOKEN"
+    },
+    {
+      "id": "F12-chore-release",
+      "fixtures": [
+        "F12"
+      ],
+      "script": "version_consistency_audit",
+      "impl": "*",
+      "path": "release_signals[].kind",
+      "op": "contains",
+      "value": "commit-chore-release"
+    },
+    {
+      "id": "F12-breaking",
+      "fixtures": [
+        "F12"
+      ],
+      "script": "version_consistency_audit",
+      "impl": "*",
+      "path": "release_signals[].kind",
+      "op": "contains",
+      "value": "commit-breaking"
+    },
+    {
+      "id": "F12-fix",
+      "fixtures": [
+        "F12"
+      ],
+      "script": "version_consistency_audit",
+      "impl": "*",
+      "path": "release_signals[].kind",
+      "op": "contains",
+      "value": "commit-fix"
+    },
+    {
+      "id": "F12-footer",
+      "fixtures": [
+        "F12"
+      ],
+      "script": "version_consistency_audit",
+      "impl": "*",
+      "path": "release_signals[].kind",
+      "op": "contains",
+      "value": "breaking-footer"
+    },
+    {
+      "id": "F13-monorepo",
+      "fixtures": [
+        "F13"
+      ],
+      "script": "version_consistency_audit",
+      "impl": "*",
+      "path": "monorepo_mode",
+      "op": "is_true"
+    },
+    {
+      "id": "F13-packages",
+      "fixtures": [
+        "F13"
+      ],
+      "script": "version_consistency_audit",
+      "impl": "*",
+      "path": "packages",
+      "op": "count_gte",
+      "value": 2
+    },
+    {
+      "id": "F14-color",
+      "fixtures": [
+        "F14"
+      ],
+      "script": "branch_cleanup_audit",
+      "impl": "*",
+      "path": "local_merged_candidates",
+      "op": "contains",
+      "value": "feature/merged"
+    },
+    {
+      "id": "NEG-path-notgit",
+      "fixtures": [
+        "NEG-PATH"
+      ],
+      "script": "*",
+      "impl": "*",
+      "path": "is_git",
+      "op": "is_false",
+      "note": "无效 --repo 必须显式报告，绝不静默分析当前目录"
+    },
+    {
+      "id": "NEG-file-notgit",
+      "fixtures": [
+        "NEG-FILE"
+      ],
+      "script": "*",
+      "impl": "*",
+      "path": "is_git",
+      "op": "is_false"
+    },
+    {
+      "id": "NEG-novalue-nohang",
+      "fixtures": [
+        "NEG-NOVALUE"
+      ],
+      "script": "*",
+      "impl": "sh",
+      "op": "no_hang",
+      "timeout_seconds": 5,
+      "note": "--repo 漏值不得死循环（POSIX shift 语义）"
+    },
+    {
+      "id": "F3-recent-root",
+      "fixtures": [
+        "F3"
+      ],
+      "script": "git_state_snapshot",
+      "impl": "*",
+      "path": "recent_changed_files",
+      "op": "is_nonempty_array",
+      "note": "仅根提交的仓库必须回退 git show，不得静默变空"
+    },
+    {
+      "id": "F6-recent-nonempty",
+      "fixtures": [
+        "F6"
+      ],
+      "script": "git_state_snapshot",
+      "impl": "*",
+      "path": "recent_changed_files",
+      "op": "is_nonempty_array",
+      "note": "提交数<=10 的仓库不得因 HEAD~n 不存在而变空"
+    }
+  ]
+}

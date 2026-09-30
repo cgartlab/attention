@@ -6,4 +6,7 @@
 Thumbs.db
 *.swp
 # local test scratch
-__lzsnap_test/
+__attention_test/
+# eval 证据为可再生产物，不入库（用户 2026-09-30 决定）
+evals/results/
+evals/.work/

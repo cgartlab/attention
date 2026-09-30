@@ -1,5 +1,12 @@
 {
-  "skill_name": "lizheng",
+  "skill_name": "attention",
+  "note": "行为层 eval（需 agent 执行）。断言描述的是目标行为，不随脚本字段变更而变。环境限制见 docs/VALIDATION.md：本仓库的开发环境无法建立可用远程，故\"创建 PR\"类断言的实测只能到\"PR 就绪产物\"。",
+  "fixtures": {
+    "generator": "evals/fixtures.ps1 + evals/fixtures.sh（成对）",
+    "script_assertions": "evals/script-assertions.json",
+    "runner": "evals/run_evals.ps1 + evals/run_evals.sh",
+    "note": "fixture 默认生成到系统临时目录（F1 为非 git 目录负例，放在仓库内会因向上找到本仓库而失效）"
+  },
   "evals": [
     {
       "id": 1,
@@ -8,10 +15,18 @@
       "expected_output": "对干净仓库：ff-only拉取默认分支、仅删除已合并的无价值分支（本地与远程）、保留受保护分支、给出基于真实信号的下一步建议；不force push、不删未合并分支。",
       "files": [],
       "assertions": [
-        {"text": "使用 git pull --ff-only 同步默认分支，未产生合并提交"},
-        {"text": "仅删除已完全合并入默认分支的分支，未删除任何未合并分支"},
-        {"text": "未对默认分支或受保护分支执行 force push 或删除"},
-        {"text": "下一步建议基于真实信号（近期提交/开放issue-PR/TODO/测试信号），未编造"}
+        {
+          "text": "使用 git pull --ff-only 同步默认分支，未产生合并提交"
+        },
+        {
+          "text": "仅删除已完全合并入默认分支的分支，未删除任何未合并分支"
+        },
+        {
+          "text": "未对默认分支或受保护分支执行 force push 或删除"
+        },
+        {
+          "text": "下一步建议基于真实信号（近期提交/开放issue-PR/TODO/测试信号），未编造"
+        }
       ]
     },
     {
@@ -21,10 +36,18 @@
       "expected_output": "脏态：诊断未提交改动、提修复计划、执行修复至测试绿（或如实报告阻塞）、提交前同步核心文档、在GitHub开PR。",
       "files": [],
       "assertions": [
-        {"text": "先诊断全部未提交/未推送改动并出清单，未边找边改"},
-        {"text": "修复后测试/lint/build 绿，或如实报告未通过的项"},
-        {"text": "提交前更新了核心文档以反映真实 diff，未编造文档内容"},
-        {"text": "在 GitHub 上创建了 PR，PR 描述含动机/改动/验证/一致性声明"}
+        {
+          "text": "先诊断全部未提交/未推送改动并出清单，未边找边改"
+        },
+        {
+          "text": "修复后测试/lint/build 绿，或如实报告未通过的项"
+        },
+        {
+          "text": "提交前更新了核心文档以反映真实 diff，未编造文档内容"
+        },
+        {
+          "text": "在 GitHub 上创建了 PR，PR 描述含动机/改动/验证/一致性声明"
+        }
       ]
     },
     {
@@ -34,10 +57,18 @@
       "expected_output": "涉及release：审计所有版本文件、一致bump、补CHANGELOG、不编造版本号、不擅自跳大版本。",
       "files": [],
       "assertions": [
-        {"text": "检测到涉及 release 并触发发行版本门槛"},
-        {"text": "所有版本承载文件的版本号一致（一致bump）"},
-        {"text": "CHANGELOG 补了仅基于真实 diff 的条目，未编造版本或变更"},
-        {"text": "版本号经用户确认或来自真实版本文件，未擅自跳大版本"}
+        {
+          "text": "检测到涉及 release 并触发发行版本门槛"
+        },
+        {
+          "text": "所有版本承载文件的版本号一致（一致bump）"
+        },
+        {
+          "text": "CHANGELOG 补了仅基于真实 diff 的条目，未编造版本或变更"
+        },
+        {
+          "text": "版本号经用户确认或来自真实版本文件，未擅自跳大版本"
+        }
       ]
     },
     {
@@ -47,9 +78,15 @@
       "expected_output": "非GitHub：完成本地流程，给出PR/MR就绪产物与手动指引，不调用 gh pr create。",
       "files": [],
       "assertions": [
-        {"text": "未调用 gh pr create（远程非 GitHub）"},
-        {"text": "完成了本地提交与文档/版本一致性保证"},
-        {"text": "输出了 PR/MR 就绪产物（分支、diff 概览、建议标题/正文、宿主创建指引）"}
+        {
+          "text": "未调用 gh pr create（远程非 GitHub）"
+        },
+        {
+          "text": "完成了本地提交与文档/版本一致性保证"
+        },
+        {
+          "text": "输出了 PR/MR 就绪产物（分支、diff 概览、建议标题/正文、宿主创建指引）"
+        }
       ]
     }
   ]
