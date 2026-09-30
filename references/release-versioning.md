@@ -14,7 +14,7 @@
 - 跨语言/多模块：全部版本文件都要一致。
 
 ## 一致性规则
-1. 跑 `version_consistency_audit.ps1`，拿全部版本串。
+1. 跑 `version_consistency_audit`，拿全部版本串。
 2. 若不一致：
    - 提议统一版本号（语义化版本：feat→minor、fix→patch、BREAKING→major；取最高或用户意图）。
    - 用 `ask_user_question` 确认版本号，不擅自定。
