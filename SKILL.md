@@ -51,6 +51,8 @@ metadata:
 - 脚本只做只读采集与候选计算，绝不自己提交、推送、删分支、开 PR。所有变更动作由你（模型）按本工作流显式执行。
 - 脚本路径相对本 skill 基础目录。用你的 shell 工具运行：pwsh -NoProfile -File "<base>/scripts/<name>.ps1" --help。
 
+- **双实现**（P1 起）：脚本有 bash(.sh) 与 PowerShell(.ps1) 两套，输出同形 JSON。按 `environment-and-prereqs.md` §6 探测 shell 选其一；契约见 `references/scan-recipes.md`。
+
 > 为什么用脚本：git branch --merged 的输出、版本号的跨文件一致性、核心文档的交叉引用——这些一旦手写极易漏判，且每次都重复。写成黑盒跑一次出 JSON，判断质量稳定，上下文也干净。
 
 ## 工作流总览（决策树）
