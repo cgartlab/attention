@@ -6,15 +6,23 @@
 
 ## [Unreleased]
 
+### Added
+- **P1 脚本解耦**：scripts/ 新增 bash（.sh）实现，与 PowerShell（.ps1）并行，覆盖 5 个采集脚本 + 共享助手 `scripts/_lib.sh`（无 bash-4 特性，兼容 macOS bash 3.2；GNU/BSD date）。
+- `references/scan-recipes.md`：5 个脚本的 git 命令配方 + JSON 契约（单一事实源），.sh 与 .ps1 都照此对齐。
+- `references/environment-and-prereqs.md` §6：Phase 0 shell 探测与路径选择（bash→.sh / pwsh→.ps1 / 无脚本回退）。
+- `docs/DEVELOPMENT-PLAN.md`：跨 harness 通用化开发计划。
+- 默认分支 master -> main。
+- **P2 Agent Skills 标准对齐**：README 增加 `npx skills add cgartlab/lizheng` 安装路径与 skills.sh / Agent Skills 兼容徽章；确认 frontmatter（name+description）符合开放标准。
+
 ### Changed
 - 收尾报告改用大白话：主叙事面向项目作者（含刚入行的开发者），禁止字段名 / 命令串 / JSON 键进入主叙事，原始技术信号另放末尾"📋 技术细节（可选）"小节，主叙事必须能独立读懂。SKILL.md 的 Phase 4 新增"报告语言原则"小节并说明原因。
 
 ### Fixed
-- TODO 扫描排除自身源文件（scripts/next_steps_analysis.ps1），消除 3 条自指假阳性。
+- TODO 扫描排除自身源文件（scripts/next_steps_analysis.ps1 与 .sh），消除自指假阳性。
 
-### Added
-- docs/DEVELOPMENT-PLAN.md：跨 harness 通用化开发计划（调研、可移植性架构、P1-P5 路线图）。
-- 默认分支 master -> main。
+### Notes
+- bash（.sh）实现未在本环境验证（无 bash）；待有 bash 的环境实跑确认契约一致。
+- `npx skills add` 安装路径需仓库推送到 GitHub 后方可验证；当前未推送（按计划推迟建远程）。
 
 ## [0.1.0] - 2026-09-29
 
