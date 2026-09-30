@@ -2,36 +2,95 @@
 
 Phase 2 分流与各门槛的精确边界。判定要保守：拿不准归脏态，让人看一眼。
 
-## 干净态 vs 脏态
-脏态当且仅当以下三条任一为真：
-- 未提交改动：staged、unstaged、untracked 任一非空（untracked 只计未被 .gitignore 排除者）。
-- 未推送提交：当前分支存在可达但不在任何 remote-tracking ref（`refs/remotes/*`）上的提交。无 upstream 时视全部为未推送。
-- 未推送分支：本地分支其 tip 不被任何远程 ref 覆盖。
+> **本文件是这些判定定义的单一事实源**：干净/脏态、未推送判定、无价值分支、陈旧阈值、涉及 release 的多层门、核心文档集、门槛通过条件——**完整定义只写在这里**。其他文件遇到这些规则一律引用本文件，不复述（复述出来的副本正是历史上漂移的地方）。字段名与 `null`/`[]` 语义以 `scan-recipes.md` 的 JSON 契约为准。
 
-全假 → 干净态。有 stash 不算脏态硬条件，但要在报告里提及（stash 是隐藏的未完成工作）。
+## 干净态 vs 脏态
+脏态当且仅当以下三条任一为真（字段来自 `git_state_snapshot`，语义见 `scan-recipes.md`）：
+
+- **未提交改动**：`staged`、`unstaged`、`untracked` 任一非空（`untracked` 只计未被 `.gitignore` 排除者）。
+- **未推送提交**：`unpushed_commits` 非空。
+  - 脚本采集顺序：`origin/<默认分支>` 存在 → `git log --oneline origin/<默认分支>..HEAD`；否则有 upstream → `@{u}..HEAD`；**都没有 → `null`**。
+  - ⚠️ **`unpushed_commits=null` 表示"无任何可比远程"，属不可判定，不得判定为"干净"**。此时既不能证明推送过、也不能证明没推过，应归脏态（或至少在计划门槛里把这条不确定性列出来让用户裁定）。把 `null` 读成 `[]` 就是"把没查成讲成没有"。
+- **未推送分支**：`unpushed_branches` 非空（本地分支 tip 不被任何 `refs/remotes/*` 覆盖）。这类分支上的提交可能一条都没进过远程，即使当前分支本身是同步的。
+
+三条全假 → 干净态。`stash_count > 0` 不算脏态硬条件，但要在报告里提及（stash 是隐藏的未完成工作），且**只报告不动作**（见 `autonomy-and-safety.md`）。
 
 ## 无价值分支（可删候选）
-满足全部才算：
-1. 已完全合并入默认分支：`git branch --merged <默认分支>`（本地）或 `git branch -r --merged <默认分支>`（远程）。
-2. 不在受保护名单（见 `branch-model-and-protection.md`）。
-3. 远程删除额外要求：远端已无活跃对应分支。
+需同时满足：
 
-陈旧但未合并的分支：只报告，不删——删了等于丢工作。
+1. **已完全合并入默认分支**：本地 `git branch --merged origin/<默认分支>`；远程 `git branch -r --merged origin/<默认分支>`。
+   - **形态要求**：统一用 `origin/<默认分支>`。本地没有同名分支时 `git branch --merged <默认分支>` 会 `unknown revision`，静默给出空集（把全部候选漏报成"没有可清理的分支"）。
+2. **不在受保护名单**（名单与判定见 `branch-model-and-protection.md`）。
+3. **远程候选另有第四条判据**：见 `branch-model-and-protection.md` 的"远程剪枝"（已合并 + 非受保护 + **无开放 PR**）。
+   - ❌ **不得**把删除条件写成"远端已经没有这个分支了"（或等价的"远端不再有对应 ref"）：候选本身就来自 remote-tracking ref，`git fetch --prune` 之后该条件**恒假**，规则会退化成永远没有候选（表面"干净"，实际漏报）。
 
-## 未推送提交（精确）
-- 有 upstream：`git log @{u}..HEAD --oneline` 非空。
-- 无 upstream：`git log <默认远程>/<默认分支>..HEAD` 非空，或无可比远程则当前分支全部提交视为未推送。
+**陈旧但未合并的分支：只报告，不删**——删了等于丢工作。
 
-## 涉及 release
-满足任一：
-- 变更集（未提交 + 未推送）触及任意版本承载文件（见 `release-versioning.md`）。
-- 提交信息含 `chore(release)` / `feat!` / `BREAKING CHANGE`。
-- 用户明示"这是 release / 要发版"。
+## 陈旧 / 活跃的阈值（可判定，不留形容词）
+- `age_days` 由脚本按 `now − <分支 tip 的 commit date>` 计算（见 `scan-recipes.md` 的 `branch_cleanup_audit`）。
+- **陈旧（stale）**：`age_days > 30`。
+- **活跃（active）**：`age_days <= 30`。
+- **30 天是默认值，允许覆盖**：项目有明确节奏（月度发版、季度维护分支）或用户给了口径时按用户口径。**覆盖时必须说明用的阈值与理由**（例如"按项目季度维护节奏用 90 天"），不能默默换数。
+- 陈旧 + 未合并 → 进 `local_stale_unmerged_report`，**只报告**。
 
-触发发行版本门槛。
+## 涉及 release：多层门（信号层 → 门槛层）
+**脚本只负责信号层；门槛层判定是模型职责，且必须写明理由**（指到具体文件/符号/提交，不能只给一个布尔值）。
 
-## 核心文档集（默认）
-README*、CHANGELOG*、CHANGES*、HISTORY*、AGENTS.md、CLAUDE.md、CONTRIBUTING*、LICENSE*、`docs/**` 下被 README 索引的文档 + 各生态版本文件。项目可覆盖。
+### 第一层 信号层（宽口径："可能涉及 release"）
+由 `version_consistency_audit` 的 `release_signals[]` 给出。**kind 取值与产出规则的权威定义在 `scan-recipes.md` 的 `release_signals` 契约**；下表只是"谁产出"的分层视图，有出入以契约为准：
+
+| 信号 kind | 触发条件 | 谁产出 |
+|---|---|---|
+| `version-file-touched` | 变更集与任一版本承载文件有交集 | 脚本 |
+| `commit-chore-release` | 提交标题含 `chore(release)` | 脚本 |
+| `commit-breaking` | 提交标题含 `feat!` / `fix!` | 脚本 |
+| `commit-feat` | 提交标题以 `feat` 开头 | 脚本 |
+| `commit-fix` | 提交标题以 `fix` 开头 | 脚本 |
+| `breaking-footer` | 提交正文前 20 行含 `BREAKING CHANGE:` / `BREAKING-CHANGE:` | 脚本 |
+| `user-intent` | 用户明示要发版，或传了 `--target-version` | **模型补写**（脚本不臆测用户话语） |
+
+宽口径意味着**信号非空 ≠ 要 bump**：`fix:`/`feat:` 天天有；`version-file-touched` 可能只是改了 README 里的一行版本号示例。
+
+### 第二层 门槛层（窄口径："本次真的需要 bump"）
+信号层命中后，逐个信号问一句：**这个改动对使用者的可见行为有变化吗？** 按下表判定：
+
+| 情形 | 需要 bump？ | 必须给出的理由 |
+|---|---|---|
+| diff 改了公开 API / CLI 参数 / 配置项 / 输出格式 / 数据格式 | **是**（按语义化版本定 major/minor/patch） | 指到具体符号或文件 |
+| diff 删除或废弃了对外能力 | **是** | 指到具体符号或文件 |
+| 版本承载文件之间已不一致（`consistent=false`），或用户给了目标版本 | **是** | 列出 `distinct_versions` 与目标版本 |
+| 仅文档 / 测试 / CI / 构建脚本 / 纯内部重构，无对外行为变化 | 否 | 说明"无对外行为变化" |
+| 项目按日程发版（如每月固定），与改动内容无关 | 否（版本门槛不阻塞本次提交） | 说明节奏来源 |
+| changelog-only 项目（`CHANGELOG.md` 是唯一版本源） | 按项目约定 | 说明约定出处 |
+| 拿不准 | **归"需要 bump"**，在计划门槛里问用户 | 说明不确定点 |
+
+- `consistent=null`（无版本文件，如 Go 模块）的处理见 `release-versioning.md`；Go 项目的版本门槛落到 tag 计划上。
+- 判定"需要 bump" → 进入发行版本门槛，按 `release-versioning.md` 执行。
+- 判定"不需要 bump" → 跳过该门槛，但**理由必须写进报告**（用户要能看到你为什么没动版本号）。
+
+## 核心文档集（默认；**完整定义只在本节**）
+按**顶层普通文件**的**文件名前缀**匹配（目录不算；`README*` 同时覆盖 `README.md`/`README.rst`/`README`）：
+
+`README*`、`CHANGELOG*`、`CHANGES*`、`HISTORY*`、`AGENTS.md`、`CLAUDE.md`、`CONTRIBUTING*`、`LICENSE*`
+
+外加：**被 README 索引的 `docs/**` 文档**（README 里以相对路径/链接指向的 `docs/` 下文件）。
+
+- **项目可覆盖**：仓库有既成的文档布局（`doc/`、`documentation/`、`website/docs/`）或 `CONTRIBUTING` 里写明了文档规范时，按项目实际布局替换默认集；覆盖后必须在报告的"技术细节"里说明用了哪套集合。
+- 版本承载文件跟着核心文档集一起核对，清单见 `version-file-inventory.md`（一致性规则见 `release-versioning.md`）。
+- 脚本侧的 `core_docs` 字段用的是**更宽的口径**（全部 `docs/**/*.md` 前 50 个，见 `scan-recipes.md`），它是**低精度近似**：可能列出不属于本集合的文档，也可能漏掉 `doc/`、`documentation/` 等非 `docs/` 布局。扫描结果与本集合冲突时，**以本节定义为准**，扫描结果只当提示。
+
+## 门槛通过条件（可判定）
+两个提交前门槛的"通过"都**不是"没发现问题"**，而是"该做的事做完了"：
+
+- **文档门槛通过** = 对本次变更集里每一个影响对外行为的改动，都**逐条对照 diff 检查了相关文档段落，并把该段落改到与 diff 一致**；或明确判定"本次无需文档更新"并给出理由（见 `core-docs-sync.md` 的"什么时候不更新文档"）。
+  - ❌ **不是**"`core_docs_relevance_scan` 结果为空"。该扫描是低精度提示：`docs_mentioning_changes=[]` 在"文档只写函数名/命令名、不写文件名"的仓库里**恒为空**，而那恰恰是最该补文档的情况；`docs_stale_candidates` 才是"请人工确认"的清单。
+  - **未消解的 `［待补充：…］` 占位符 = 未通过**：处置方式（补内容 / 排除出提交 / 列为 PR 阻塞项，三选一）见 `core-docs-sync.md`。
+- **版本门槛通过** = 二选一：
+  - 已按门槛层判定"需要 bump"，并完成：所有版本承载文件一致 bump（含 lockfile 里的声明）+ 补了可溯源的 CHANGELOG 条目 + 记录了 tag 计划；**或**
+  - 已按门槛层判定"不需要 bump"，并在报告里写明理由。
+  - `consistent=null` 只算"无从判定"，**不算通过**。
+
+细则：文档门槛见 `core-docs-sync.md`，版本门槛见 `release-versioning.md`。
 
 ## 拿不准怎么办
-归脏态，在计划门槛里向用户列出不确定点，让用户裁定。不默认假设"应该是干净的"。
+归脏态，在计划门槛里向用户列出不确定点，让用户裁定。不默认假设"应该是干净的"。`null`（没查成）与 `[]`（确实是空）是两件事，报告里必须分开说。
