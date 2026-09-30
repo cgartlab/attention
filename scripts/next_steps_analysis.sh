@@ -53,10 +53,7 @@ if [ -n "$default" ]; then od="origin/$default"
 fi
 dj="null"; [ -n "$default" ] && dj="\"$(jes "$default")\""
 missing_out=$(for e in README CHANGELOG LICENSE AGENTS CONTRIBUTING; do
-  ls "$e"* >/dev/null 2>&1 || printf '%s`n' "$e"
+  ls "$e"* >/dev/null 2>&1 || printf '%s\n' "$e"
 done | jarr_str)
 printf '{"is_git":true,"default_branch":%s,"behind_default":%s,"recent_commits":%s,"is_github":%s,"gh_authed":%s,"open_issues":%s,"open_prs":%s,"todo_fixme":%s,"branches":%s,"test_commands":%s,"missing_core_docs":%s}\n' \
-  "$dj" "$behind" "$recent_commits" "$is_github" "$gh_authed" "$issues" "$prs" "$todos" "$branches_out" "$tc_out"
-printf '{"is_git":true,"default_branch":%s,"behind_default":%s,"recent_commits":%s,"is_github":%s,"gh_authed":%s,"open_issues":%s,"open_prs":%s,"todo_fixme":%s,"branches":%s,"test_commands":%s}\n' \
-  "$dj" "$behind" "$recent_commits" "$is_github" "$gh_authed" "$issues" "$prs" "$todos" "$branches_out" "$tc_out"
-  "$dj" "$behind" "$recent_commits" "$is_github" "$gh_authed" "$issues" "$prs" "$todos" "$branches_out" "$tc_out"
+  "$dj" "$behind" "$recent_commits" "$is_github" "$gh_authed" "$issues" "$prs" "$todos" "$branches_out" "$tc_out" "$missing_out"
