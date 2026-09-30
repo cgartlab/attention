@@ -16,7 +16,7 @@
 - **提交规约**：conventional commits（`feat`/`fix`/`docs`/`chore`）。
 - **版本策略**：技能尚不完善，版本保持 `0.1.0`；变更记入 `CHANGELOG.md` 的 `[Unreleased]`，不随每次改动切版本号。
 - **改脚本要成对**：同时改 `.sh` 与 `.ps1`，并对齐 `references/scan-recipes.md` 契约，防双份漂移。
-- **自检**：在 lizheng 仓库上跑立正本身（`pwsh -NoProfile -File scripts/*.ps1 --repo .`）确认无回归。
+- **自检**：在 lizheng 仓库上一键冒烟 `pwsh -NoProfile -File scripts/smoke_test.ps1 --repo .`（bash 侧 `bash scripts/smoke_test.sh`），确认 5 个脚本都吐合法 JSON、无回归。
 
 ## 依赖
 `git`（必需）；`gh`（可选，开 PR 用）。运行时不要求 Python/Node/pwsh/bash 作为硬依赖——缺某条脚本路径的前置就换路径或走无脚本回退。
