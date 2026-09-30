@@ -3,128 +3,260 @@
 .SYNOPSIS
   Gather signals for next-step development suggestions (read-only).
 .DESCRIPTION
-  Collects recent commits, open GitHub issues/PRs, TODO/FIXME hits, branch ages,
-  detected test/lint/build commands, and divergence from default branch. Prints
-  one JSON object of raw signals. The model reasons over these to suggest next steps.
+  Read-only: prints one JSON object of raw signals on stdout (contract:
+  references/scan-recipes.md §5). The model reasons over these signals.
+  --repo must exist and be a directory; otherwise the script prints
+  {"is_git":false,"error":"repo path not found"} and exits 0.
 .PARAMETER repo
-  Path to the repository. Defaults to the current location.
+  Repository path (default: current directory).
+.PARAMETER defaultBranch
+  Override the auto-detected default branch (used for behind_default).
 .EXAMPLE
   pwsh -NoProfile -File scripts/next_steps_analysis.ps1 --repo D:\code\myproj
 #>
-param(
-  [string]$repo,
-  [switch]$help
-)
-
-if ($help) {
-  Write-Host "Usage: pwsh -NoProfile -File next_steps_analysis.ps1 [--repo <path>]"
-  Write-Host "Read-only signals: recent commits, open issues/PRs, TODO/FIXME hits,"
-  Write-Host "branch ages, detected test/lint/build commands, divergence from default branch."
-  exit 0
-}
-
-if ($repo) { Set-Location -LiteralPath $repo }
 $ErrorActionPreference = 'SilentlyContinue'
+$env:GIT_TERMINAL_PROMPT = '0'
+$env:GIT_PAGER = 'cat'
 
-function Test-GitOk { param([string[]]$a); & git @a 2>$null | Out-Null; $LASTEXITCODE -eq 0 }
-if (-not (Test-GitOk 'rev-parse','--is-inside-work-tree')) {
-  Write-Output (ConvertTo-Json -Compress -Depth 4 ([ordered]@{ is_git = $false; error = "not a git repository" }))
+$script:GitExe = (Get-Command git -ErrorAction SilentlyContinue).Source
+if (-not $script:GitExe) { $script:GitExe = 'git' }
+
+function GitOut { param([string[]]$a); return (& $script:GitExe -c color.ui=never @a 2>$null) }
+function Git1 {
+  param([string[]]$a)
+  $o = @(GitOut $a)
+  if ($o.Count -eq 0) { return $null }
+  $s = ([string]$o[0]).TrimEnd("`r")
+  if ($s -eq '') { return $null }
+  return $s
+}
+function GitOk { param([string[]]$a); & $script:GitExe -c color.ui=never @a 2>$null | Out-Null; return ($LASTEXITCODE -eq 0) }
+function NonBlank { param($Lines); return ,@(@($Lines) | Where-Object { $null -ne $_ -and ([string]$_).Trim() -ne '' }) }
+function ToPosix([string]$p) {
+  if ($null -eq $p) { return $p }
+  return ($p -replace '\\','/' -replace '\r$','')
+}
+function HostOfUrl([string]$u) {
+  if (-not $u) { return $null }
+  if ($u -like '*://*') {
+    $rest = $u.Substring($u.IndexOf('://') + 3)
+    $slash = $rest.IndexOf('/')
+    if ($slash -ge 0) {
+      $head = $rest.Substring(0, $slash)
+      $at = $head.LastIndexOf('@')
+      if ($at -ge 0) { $rest = $rest.Substring($at + 1) }
+    }
+    $slash = $rest.IndexOf('/')
+    if ($slash -ge 0) { $rest = $rest.Substring(0, $slash) }
+    $colon = $rest.IndexOf(':')
+    if ($colon -ge 0) { $rest = $rest.Substring(0, $colon) }
+    if ($rest) { return $rest }
+    return $null
+  }
+  if ($u -like '*@*:*') {
+    $rest = $u.Substring($u.IndexOf('@') + 1)
+    $colon = $rest.IndexOf(':')
+    if ($colon -ge 0) { $rest = $rest.Substring(0, $colon) }
+    if ($rest) { return $rest }
+  }
+  return $null
+}
+function MaskUrl([string]$u) {
+  if (-not $u) { return $null }
+  if ($u -match '^([A-Za-z][A-Za-z0-9+.-]*://)[^/]*@') { return ($u -replace '^([A-Za-z][A-Za-z0-9+.-]*://)[^/]*@', '${1}***@') }
+  if ($u -match '^[^/@]+@[^/]*:') { return ($u -replace '^[^/@]+@', '***@') }
+  return $u
+}
+
+# ---------- 入参 ----------
+$RepoArg = $null; $HaveRepoArg = $false; $DefaultArg = $null; $Help = $false
+$argv = @($args)
+for ($i = 0; $i -lt $argv.Count; $i++) {
+  $a = [string]$argv[$i]
+  if ($a -eq '--repo') { if ($i + 1 -lt $argv.Count) { $RepoArg = [string]$argv[$i + 1]; $i++ } else { $HaveRepoArg = $true } }
+  elseif ($a -eq '--defaultBranch') { if ($i + 1 -lt $argv.Count) { $DefaultArg = [string]$argv[$i + 1]; $i++ } }
+  elseif ($a -eq '--help' -or $a -eq '-h') { $Help = $true }
+}
+
+if ($Help) {
+  Write-Host "Usage: pwsh -NoProfile -File next_steps_analysis.ps1 [--repo <path>] [--defaultBranch <name>] [--help]"
+  Write-Host ""
+  Write-Host "Read-only signal collection for next-step suggestions, as one JSON object."
+  Write-Host ""
+  Write-Host "  --repo <path>            Repository path (default: current directory). Must exist and"
+  Write-Host "                           be a directory, otherwise prints"
+  Write-Host "                           {""is_git"":false,""error"":""repo path not found""} and exits 0."
+  Write-Host "  --defaultBranch <name>   Override the auto-detected default branch (used for"
+  Write-Host "                           behind_default)."
+  Write-Host "  --help, -h               Print this usage and exit 0."
+  Write-Host ""
+  Write-Host "Fields: is_git, default_branch, behind_default, recent_commits, is_github,"
+  Write-Host "remote_url_masked, gh_authed, gh_query_state, open_issues, open_prs, todo_fixme,"
+  Write-Host "branches, test_commands, missing_core_docs, warnings."
   exit 0
 }
 
-$recent = @()
-$rl = git log --oneline -n 15 2>$null
-if ($rl) { $recent = @($rl -split "`n" | Where-Object { $_ }) }
+if ($HaveRepoArg -or ($RepoArg -and -not (Test-Path -LiteralPath $RepoArg -PathType Container))) {
+  Write-Output '{"is_git":false,"error":"repo path not found"}'
+  exit 0
+}
+if ($RepoArg) { Set-Location -LiteralPath $RepoArg }
 
-$remote = git remote -v 2>$null
+if (-not (GitOk @('rev-parse','--is-inside-work-tree'))) {
+  Write-Output '{"is_git":false,"error":"not a git repository"}'
+  exit 0
+}
+# 契约要求 JSON 内路径一律相对仓库根（--repo 指向子目录时同样成立）
+$top = Git1 @('rev-parse','--show-toplevel')
+if ($top) { Set-Location -LiteralPath $top }
+
+$warns = New-Object System.Collections.Generic.List[string]
+function Add-Warn([string]$w) { if ($w) { $warns.Add($w) } }
+
+$tmpR = NonBlank (GitOut @('log','--oneline','-n','15'))
+$recent = @($tmpR)
+
+# 远端 host 判定按主机名（不得对整条 URL 子串匹配）
+$remoteLine = Git1 @('remote','-v')
+$remoteUrl = $null
+if ($remoteLine) {
+  $rp = @($remoteLine -split '\s+' | Where-Object { $_ -ne '' })
+  if ($rp.Count -ge 2) { $remoteUrl = $rp[1] }
+}
+# 注意：不要用 $host —— PowerShell 的自动变量 $Host 大小写不敏感，会被它顶替
+$remoteHost = HostOfUrl $remoteUrl
 $isGithub = $false
-if ($remote -and ($remote -join "`n") -match 'github\.com') { $isGithub = $true }
-
-$ghOk = $false
-$ghCmd = Get-Command gh -ErrorAction SilentlyContinue
-if ($ghCmd) {
-  & gh auth status 2>$null | Out-Null
-  if ($LASTEXITCODE -eq 0) { $ghOk = $true }
+if ($remoteHost -eq 'github.com' -or ($remoteHost -and $remoteHost.EndsWith('.github.com', [System.StringComparison]::OrdinalIgnoreCase))) { $isGithub = $true }
+$remoteUrlMasked = $null
+if ($remoteUrl) { $remoteUrlMasked = MaskUrl $remoteUrl }
+$ghAuthed = $false
+$ghHosts = @()
+$ghExe = (Get-Command gh -ErrorAction SilentlyContinue).Source
+if ($ghExe) {
+  $ghStatus = @(& $ghExe auth status 2>&1 | ForEach-Object { [string]$_ })
+  if ($LASTEXITCODE -eq 0) { $ghAuthed = $true }
+  foreach ($l in $ghStatus) {
+    if ($l -match 'Logged in to ([A-Za-z0-9._-]+)') { $ghHosts += $Matches[1] }
+  }
+}
+if ($ghAuthed -and $remoteHost -and $ghHosts.Count -gt 0) {
+  if (-not ($ghHosts -ccontains $remoteHost)) { Add-Warn 'gh-host-mismatch' }
 }
 
-$issues = @()
-$prs = @()
-if ($isGithub -and $ghOk) {
-  $i = gh issue list --state open --limit 20 2>$null
-  if ($i) { $issues = @($i -split "`n" | Where-Object { $_ }) }
-  $p = gh pr list --state open --limit 20 2>$null
-  if ($p) { $prs = @($p -split "`n" | Where-Object { $_ }) }
+# 查询失败 -> null + gh-query-failed（绝不输出 []，那会被读成"确实没有开放 issue/PR"）
+$issues = $null; $prs = $null; $ghState = 'not-applicable'
+if ($isGithub -and $ghAuthed) {
+  $iout = @(& $ghExe issue list --state open --limit 20 2>$null); $irc = $LASTEXITCODE
+  $pout = @(& $ghExe pr list --state open --limit 20 2>$null); $prc = $LASTEXITCODE
+  if ($irc -eq 0 -and $prc -eq 0) {
+    $ghState = 'ok'
+    $tmpI = NonBlank $iout
+    $issues = @($tmpI)
+    $tmpP = NonBlank $pout
+    $prs = @($tmpP)
+  } else {
+    $ghState = 'unavailable'
+    Add-Warn 'gh-query-failed'
+  }
 }
 
-$todos = @()
-$g = git grep -n -E 'TODO|FIXME|XXX|HACK' -- . ':(exclude)*.md' ':(exclude)*.markdown' ':(exclude)*.json' ':(exclude)*.txt' ':(exclude)*.rst' ':(exclude)scripts/next_steps_analysis.ps1' ':(exclude)scripts/next_steps_analysis.sh' 2>$null
-if ($g) { $todos = @($g -split "`n" | Select-Object -First 30 | Where-Object { $_ }) }
+# --untracked 必须放在 pattern 之前；排除表按仓库根锚定（:(exclude,top)）
+$tout = @(GitOut @('grep','--untracked','-n','-E','-e','TODO|FIXME|XXX|HACK','--','.',
+  ':(exclude,top)*.md',':(exclude,top)*.markdown',':(exclude,top)*.json',':(exclude,top)*.rst',
+  ':(exclude,top)scripts/next_steps_analysis.ps1',':(exclude,top)scripts/next_steps_analysis.sh'))
+$grc = $LASTEXITCODE
+if ($grc -gt 1) { Add-Warn 'git-grep-failed' }
+$tmpT = NonBlank $tout
+$todos = @($tmpT | Select-Object -First 30)
 
+$tmpB = NonBlank (GitOut @('for-each-ref','--format=%(refname:short)%09%(committerdate:iso-strict)','refs/heads'))
+$blines = [string[]]@($tmpB)
+if ($blines.Count -gt 1) { [Array]::Sort($blines, [System.StringComparer]::Ordinal) }
 $branches = @()
-$ba = git for-each-ref --format='%(refname:short)%09%(committerdate:iso-strict)' refs/heads 2>$null
-foreach ($line in $ba) {
+foreach ($line in $blines) {
   $p = $line -split "`t"
-  if ($p.Count -ge 2 -and $p[0]) { $branches += [pscustomobject]@{ branch = $p[0]; last_commit = $p[1] } }
+  if ($p.Count -ge 2 -and $p[0]) { $branches += [pscustomobject]@{ branch = $p[0]; last_commit = ($p[1] -replace '\r$','') } }
 }
 
 $testCmds = @()
-if (Test-Path 'package.json') {
+$tcNames = @()
+function Add-TestCmd([string]$name, [string]$script) {
+  if (-not $name -or -not $script) { return }
+  if ($script:tcNames -ccontains $name) { return }
+  $script:tcNames += $name
+  $script:testCmds += [pscustomobject]@{ name = $name; script = $script }
+}
+if (Test-Path -LiteralPath 'package.json') {
   try {
     $pj = Get-Content -Raw -LiteralPath 'package.json' | ConvertFrom-Json
     if ($pj.scripts) {
       foreach ($k in 'test','lint','build','check','typecheck','format') {
-        if ($pj.scripts.$k) { $testCmds += [pscustomobject]@{ name = $k; script = $pj.scripts.$k } }
+        $p = $pj.scripts.PSObject.Properties[$k]
+        if ($p) { Add-TestCmd $k ([string]$p.Value) }
       }
     }
   } catch {}
 }
-if (Test-Path 'Makefile') {
+if (Test-Path -LiteralPath 'Makefile') {
   $mk = Get-Content -Raw -LiteralPath 'Makefile'
   foreach ($t in 'test','lint','build','check') {
-    if ($mk -match "(?m)^$t\s*:") { $testCmds += [pscustomobject]@{ name = $t; script = "make $t" } }
+    if ($mk -cmatch "(?m)^$t\s*:") { Add-TestCmd $t "make $t" }
   }
 }
-if (Test-Path 'pyproject.toml') {
+if (Test-Path -LiteralPath 'pyproject.toml') {
   $py = Get-Content -Raw -LiteralPath 'pyproject.toml'
   foreach ($t in 'pytest','ruff','mypy') {
-    if ($py -match $t) { $testCmds += [pscustomobject]@{ name = $t; script = $t } }
+    if ($py -cmatch $t) { Add-TestCmd $t $t }
   }
 }
 
+# 默认分支探测
 $default = $null
-$sym = git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>$null
-if ($sym) { $default = $sym -replace '^origin/', '' }
-if (-not $default) {
-  foreach ($b in 'main','master','develop','trunk') {
-    if (Test-GitOk 'show-ref','--verify','--quiet',"refs/heads/$b") { $default = $b; break }
+if ($DefaultArg) { $default = $DefaultArg }
+else {
+  $sym = Git1 @('symbolic-ref','--quiet','--short','refs/remotes/origin/HEAD')
+  if ($sym) { $default = ($sym -replace '^origin/','') }
+  if (-not $default) {
+    $lr = Git1 @('ls-remote','--symref','origin','HEAD')
+    if ($lr -and $lr -match '^ref:\s+(\S+)') { $default = ($Matches[1] -replace '^refs/heads/','') }
+  }
+  if (-not $default) {
+    foreach ($b in 'main','master','develop','trunk') {
+      if (GitOk @('show-ref','--verify','--quiet',"refs/heads/$b")) { $default = $b; break }
+    }
   }
 }
 
 $behind = $null
-if ($default) {
-  $od = "origin/$default"
-  if (Test-GitOk 'rev-parse','--verify',"refs/remotes/$od") {
-    $cnt = git rev-list --count "$od..HEAD" 2>$null
-    if ($cnt) { $b0 = 0; if ([int]::TryParse($cnt.Trim(), [ref]$b0)) { $behind = $b0 } }
-  }
+if ($default -and (GitOk @('rev-parse','--verify',"refs/remotes/origin/$default"))) {
+  $cnt = Git1 @('rev-list','--count',"origin/$default..HEAD")
+  if ($cnt) { $b0 = 0; if ([int]::TryParse($cnt, [ref]$b0)) { $behind = $b0 } }
 }
 
+# 缺失核心文档：顶层普通文件前缀精确匹配，区分大小写（与 Linux 上 git 行为对齐）
+$tops = @(Get-ChildItem -File -ErrorAction SilentlyContinue | ForEach-Object { $_.Name })
 $missing = @()
 foreach ($e in 'README','CHANGELOG','LICENSE','AGENTS','CONTRIBUTING') {
-  if (-not (Get-ChildItem -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -like "$e*" })) { $missing += $e }
+  $found = $false
+  foreach ($t in $tops) { if ([string]$t -and ([string]$t).StartsWith($e, [System.StringComparison]::Ordinal)) { $found = $true; break } }
+  if (-not $found) { $missing += $e }
 }
+
 $result = [ordered]@{
-  is_git          = $true
-  default_branch  = $default
-  behind_default  = $behind
-  recent_commits  = $recent
-  is_github       = $isGithub
-  gh_authed       = $ghOk
-  open_issues     = $issues
-  open_prs        = $prs
-  todo_fixme      = $todos
-  branches        = $branches
-  test_commands   = $testCmds
-  missing_core_docs = $missing
+  is_git            = $true
+  default_branch    = $default
+  behind_default    = $behind
+  recent_commits    = $recent
+  is_github         = $isGithub
+  remote_url_masked = $remoteUrlMasked
+  gh_authed         = $ghAuthed
+  gh_query_state    = $ghState
+  open_issues       = $issues
+  open_prs          = $prs
+  todo_fixme        = $todos
+  branches          = @($branches)
+  test_commands     = @($testCmds)
+  missing_core_docs = @($missing)
+  warnings          = @($warns)
 }
 Write-Output (ConvertTo-Json -Depth 8 $result)
