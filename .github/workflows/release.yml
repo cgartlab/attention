@@ -84,10 +84,10 @@ jobs:
           set -euo pipefail
           ver="${{ steps.ver.outputs.version }}"
           mkdir -p dist
-          # 交付物 = skill 本体（SKILL.md + references + assets + scripts），不含开发/评测设施
-          zip -r "dist/attention-${ver}.zip" \
-            SKILL.md references assets scripts \
-            -x 'scripts/*.tmp' -x '*/.git/*'
+          # 交付物 = skill 本体（SKILL.md + references + assets + scripts）+ LICENSE；
+          # 用 git archive 只打包**已跟踪**文件（零额外 action、天然排除 .git 与未跟踪物）。
+          git archive --format=zip --prefix="attention-${ver}/" -o "dist/attention-${ver}.zip" \
+            HEAD SKILL.md references assets scripts LICENSE
           ( cd dist && sha256sum "attention-${ver}.zip" > SHA256SUMS )
           ls -l dist
 
@@ -105,8 +105,10 @@ jobs:
             "dist/SHA256SUMS"
 
       # provenance 证明：public 仓库可直接用；private 仓库上若组织策略不允许会失败，故允许跳过
+      # provenance：官方现行 action 是 actions/attest（attest-build-provenance 已废弃为 wrapper）。
+      # private 仓库上 attestation 需 GitHub Enterprise Cloud，故失败不阻塞发布（首次发布看日志确认）。
       - name: 产物来源证明（attestation，失败不阻塞发布）
         continue-on-error: true
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest@v4
         with:
           subject-path: dist/attention-*.zip

@@ -28,10 +28,10 @@
 
 立正符合 [Agent Skills](https://agentskills.io) 开放标准（`SKILL.md` + `name`/`description` frontmatter），可装到兼容 harness（Claude Code、Codex、Cursor、OpenCode 等）。
 
-**⚠️ 本仓库托管为 private（私有）**：`skills` CLI 与 skills.sh 徽章面向**公开**仓库，在私有仓库上用不了。请用下面的"手动安装"：
+**⚠️ 本仓库托管为 private（私有）**：`skills` CLI **支持私有仓库**（用你已配置的 git 凭据 / `gh` / SSH），但**消费方必须有本仓库读权限**；skills.sh 徽章只对公开仓库有效，在本仓库上不显示。也可以直接"手动安装"：
 
 ```bash
-npx skills add cgartlab/attention   # 仅当仓库公开时可用；本仓库为 private，请走手动安装
+npx skills add cgartlab/attention   # 私有仓库亦可，但需有本仓库读权限（凭据由 gh/git 提供）
 ```
 
 **手动安装**（现在就能用）：把本仓库克隆/复制到你所用 harness 的 skills 目录。各 harness 的默认位置：

@@ -66,11 +66,14 @@ jobs:
       - name: smoke_test（bash 侧）
         run: bash scripts/smoke_test.sh --repo .
 
-      - name: 冒烟必须对"非 git 目录"给出预期结论（负例）
+      - name: 负例：无效 --repo 必须判失败（非 git 目录则应判通过）
         run: |
           set -e
-          tmp="$(mktemp -d)"
-          if bash scripts/smoke_test.sh --repo "$tmp"; then
-            echo "::error::非 git 目录上的冒烟竟然通过——负例失效"; exit 1
+          # 无效路径 → 冒烟必须失败
+          if bash scripts/smoke_test.sh --repo "$RUNNER_TEMP/definitely-not-a-repo"; then
+            echo "::error::无效 --repo 竟然通过——--repo 校验失效"; exit 1
           fi
-          echo "负例符合预期：非 git 目录被判失败"
+          # 真实存在但非 git 的目录 → 冒烟应当通过（is_git=false 正是正确结论，不该被当成失败）
+          tmp="$(mktemp -d)"
+          bash scripts/smoke_test.sh --repo "$tmp"
+          echo "负例与正例均符合预期"

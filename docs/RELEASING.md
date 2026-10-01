@@ -57,9 +57,9 @@
 
 ## 五、私有仓库的现实约束（本仓库是 private）
 
-- **`npx skills add cgartlab/attention` 与 skills.sh 徽章不可用**：这些面向公开仓库。分发方式是**手动安装**（clone 或 junction），README 已按此写明。
+- **`npx skills add` 在私有仓库上可用**（`vercel-labs/skills` 的 README 有 "Private Repositories" 一节）：用已配置的 git 凭据/`gh`/SSH 即可，但**消费方需有本仓库读权限**；skills.sh 徽章只对公开仓库有效。
 - **Actions 用量**：私有仓库消耗额度；`ci.yml` 已设 `concurrency` 取消陈旧运行、`timeout-minutes` 兜底。
-- **provenance/attestation**：`attest-build-provenance` 步骤标了 `continue-on-error: true`——若私库策略不允许则跳过，**不让它阻塞发布**；这一步是否真正生效需在首次发布时看日志确认（**未实测**）。
+- **provenance/attestation**：官方现行 action 是 `actions/attest@v4`（`attest-build-provenance` 已废弃为 wrapper）；**private 仓库上 attestation 需 GitHub Enterprise Cloud**，故该步 `continue-on-error: true`（不阻塞发布），是否生效需首次发布看日志确认（**未实测**）。
 - 调研（`docs/ecosystem-research/`、`docs/research/`）随仓库一同私有，不会公开。
 
 ## 六、回滚
