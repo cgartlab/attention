@@ -44,14 +44,20 @@ esac
 remote_url_masked="null"
 [ -n "$remote_url" ] && remote_url_masked="\"$(jes "$(mask_url "$remote_url")")\""
 
-gh_authed=false; gh_hosts=""
+# gh_authed：**本地凭据探测**——`gh auth token` 只读本地凭据存储、不联网，退出码确定性。
+# 绝不用 `gh auth status`：它会做 API 校验，并发/机器繁忙时偶发非 0，会把"没查成"
+# 写成事实性的"未认证"，并连带翻转 gh-host-mismatch（违反 §5"没查成必须留痕"）。
+# gh 不存在时沿用原降级口径：gh_authed=false，不新增警告码。
+gh_authed=false
 if command -v gh >/dev/null 2>&1; then
-  gh_status=$(gh auth status 2>&1); gh_rc=$?
-  if [ $gh_rc -eq 0 ]; then gh_authed=true; fi
-  gh_hosts=$(printf '%s\n' "$gh_status" | grep -oE 'Logged in to [A-Za-z0-9._-]+' 2>/dev/null | awk '{print $4}' | sort -u)
-fi
-if [ "$gh_authed" = true ] && [ -n "$host" ] && [ -n "$gh_hosts" ]; then
-  printf '%s\n' "$gh_hosts" | grep -Fxq -- "$host" || warn_add "gh-host-mismatch"
+  if gh auth token >/dev/null 2>&1; then
+    gh_authed=true
+    # 宿主不匹配 = 远端 host 在本地凭据里没有 token（同样只读本地、不联网）。
+    # 网络可达性是另一件事，由 remote_reachable / gh_query_state 表达。
+    if [ -n "$host" ] && ! gh auth token --hostname "$host" >/dev/null 2>&1; then
+      warn_add "gh-host-mismatch"
+    fi
+  fi
 fi
 
 # 查询失败 -> null + gh-query-failed（绝不输出 []，那会被读成"确实没有开放 issue/PR"）
@@ -71,7 +77,9 @@ fi
 
 # --untracked 必须放在 pattern 之前（否则 git 把它当 revision 报 fatal）；
 # 排除表按仓库根锚定（:(exclude,top)），--repo 指向子目录时排除依然生效。
-tout=$(git grep --untracked -n -E -e 'TODO|FIXME|XXX|HACK' -- . \
+# XXX 必须排除连续的 X 串（mktemp 模板里的 XXXXXX/XXXXXXXX 不是待办）：
+# `(^|[^X])XXX([^X]|$)` 只命中「左右都不是 X」的孤立 XXX。
+tout=$(git grep --untracked -n -E -e 'TODO|FIXME|HACK|(^|[^X])XXX([^X]|$)' -- . \
   ':(exclude,top)*.md' ':(exclude,top)*.markdown' ':(exclude,top)*.json' ':(exclude,top)*.rst' \
   ':(exclude,top)scripts/next_steps_analysis.ps1' ':(exclude,top)scripts/next_steps_analysis.sh' 2>/dev/null)
 grc=$?
@@ -110,6 +118,18 @@ if [ -f pyproject.toml ]; then
     grep -q "$t" pyproject.toml 2>/dev/null && tc_add "$t" "$t"
   done
 fi
+# 本 skill 自带的测试入口：evals/run_evals.* 与 scripts/smoke_test.*。
+# 「这个项目有没有测试」的真实答案就在这两个文件上，不识别就等于看不见（实测本仓库
+# test_commands=[]）。script 给出对应实现路径：两套都存在时**确定性**地选 .sh
+#（不按「能否执行」探测——探测结果会随运行本脚本的 shell 变化，反而破坏 .sh/.ps1 parity）。
+skill_test_entry() { # <name> <无扩展名的相对路径>
+  if [ -f "$2.sh" ]; then tc_add "$1" "$2.sh"
+  elif [ -f "$2.ps1" ]; then tc_add "$1" "$2.ps1"
+  fi
+  return 0
+}
+skill_test_entry run_evals evals/run_evals
+skill_test_entry smoke_test scripts/smoke_test
 tc_out+="]"
 
 behind="null"

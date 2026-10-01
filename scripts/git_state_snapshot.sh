@@ -85,7 +85,10 @@ if [ -n "$cc" ] && [ "$cc" -gt 0 ] 2>/dev/null; then
   fi
 fi
 
-# 未推送提交：origin/<default> 优先，其次 upstream；两者都不存在 -> null（不可判定）
+# 未推送提交：origin/<default> 优先，其次 upstream；两者都不存在 -> null。
+# null 有两种语义，必须靠 has_remote 区分：has_remote=false -> **不适用**（没有远程可推，
+# 加 no-remote 警告）；has_remote=true 但取不到可比 ref -> **不可判定**。不得输出 []。
+if [ "$has_remote" = false ]; then warn_add "no-remote"; fi
 unpushed="null"
 range=""
 if [ -n "$DEFAULT" ] && git_ok rev-parse --verify "refs/remotes/origin/$DEFAULT"; then
@@ -97,14 +100,20 @@ if [ -n "$range" ]; then
   unpushed=$(git log --oneline "$range" 2>/dev/null | jarr_str)
 fi
 
-# 未推送分支：tip 不被任何 refs/remotes/* 覆盖的本地分支
-unpushed_shas=$(git rev-list --branches --not --remotes 2>/dev/null)
-ub_raw=""
-while IFS=' ' read -r sha name; do
-  [ -z "$name" ] && continue
-  if printf '%s\n' "$unpushed_shas" | grep -Fxq -- "$sha"; then ub_raw+="$name"$'\n'; fi
-done <<< "$(git for-each-ref --format='%(objectname) %(refname:short)' refs/heads 2>/dev/null)"
-unpushed_branches=$(printf '%s\n' "$ub_raw" | sort -u | jarr_str)
+# 未推送分支：tip 不被任何 refs/remotes/* 覆盖的本地分支。
+# **has_remote=false 时必须输出 []**：没有远程就没有「未推送分支」这一概念。
+# 否则一个完全干净的纯本地仓库会输出 ["main"]，配合判定条款会被判成脏态，
+# 进而去尝试推送一个不存在的远程（实测本仓库即如此）。
+unpushed_branches="[]"
+if [ "$has_remote" = true ]; then
+  unpushed_shas=$(git rev-list --branches --not --remotes 2>/dev/null)
+  ub_raw=""
+  while IFS=' ' read -r sha name; do
+    [ -z "$name" ] && continue
+    if printf '%s\n' "$unpushed_shas" | grep -Fxq -- "$sha"; then ub_raw+="$name"$'\n'; fi
+  done <<< "$(git for-each-ref --format='%(objectname) %(refname:short)' refs/heads 2>/dev/null)"
+  unpushed_branches=$(printf '%s\n' "$ub_raw" | sort -u | jarr_str)
+fi
 
 printf '{"is_git":true,"repo_root":%s,"has_remote":%s,"remote_host":%s,"current_branch":%s,"detached":%s,"head_short":%s,"upstream":%s,"ahead":%s,"behind":%s,"default_branch":%s,"default_branch_source":%s,"staged":%s,"unstaged":%s,"untracked":%s,"stash_count":%s,"recent_changed_files":%s,"unpushed_commits":%s,"unpushed_branches":%s,"warnings":%s}\n' \
   "$(jstr "$root")" "$has_remote" "$(jstr "$remote_host")" "$(jstr "$branch")" "$detached" \

@@ -28,7 +28,7 @@ usage() {
   --json            以 JSON 打印摘要 {out_dir,count,fixtures:[{id,label,path,notes}]}
   -h, --help        显示本帮助
 
-生成的 19 个 fixture（F1-F19）与 evals/fixtures.ps1 完全一致。
+生成的 21 个 fixture（F1-F21）与 evals/fixtures.ps1 完全一致。
 USAGE
 }
 
@@ -511,10 +511,63 @@ p="$OUT_DIR/F19-base-unverified"
 init_repo "$p"
 write_file "$p/a.txt" 'base
 '
+# 关键判别项：必须有核心文档（否则 docs_stale_candidates 恒为空，「变更集为空 -> 仍须为 []」
+# 这条断言就没有判别力——什么文档都没有时它本来就空）。README.md 提交进去，工作树保持干净。
+write_file "$p/README.md" '# nobase
+
+Library.
+'
 add_commit "$p" 'feat: base'
 # 有 remote，但没有 refs/remotes/origin/<default> —— 远程基准无从验证
 git -C "$p" remote add origin 'https://127.0.0.1:1/github.com/team/nobase.git' >/dev/null 2>&1
-register_fixture 'F19' 'remote without origin/<default>' "$p" 'remote_base_unverified=true + remote-base-unverified warning'
+register_fixture 'F19' 'remote without origin/<default>' "$p" 'remote_base_unverified=true + remote-base-unverified warning; changeset empty + has core docs -> docs_stale_candidates=[]'
+
+# ---- F20: 纯本地仓库（完全没有 remote）----
+p="$OUT_DIR/F20-local-only"
+init_repo "$p"
+write_file "$p/README.md" '# local
+
+Pure local repository: it has no remote at all.
+'
+write_file "$p/src/a.js" 'exports.a=1;
+'
+add_commit "$p" 'feat: initial local work'
+write_file "$p/src/a.js" 'exports.a=2;
+'
+add_commit "$p" 'feat: second local commit'
+# 完全没有 remote（既没有 origin，也没有任何其它 remote），工作树干净。
+# 判别项：没有远程就没有「未推送分支/未推送提交」这一概念——unpushed_branches 必须 []、
+# unpushed_commits 保持 null 但语义是「不适用」，并加 no-remote 警告。
+register_fixture 'F20' 'local-only repo (no remote at all)' "$p" 'has_remote=false; unpushed_branches=[]; unpushed_commits=null + no-remote warning; branch audit: remote_base_unverified=true, remote_merge_base=null, remote_reachable=false'
+
+# ---- F21: Agent Skill 仓库（SKILL.md + 自带测试入口）----
+p="$OUT_DIR/F21-skill-repo"
+init_repo "$p"
+write_file "$p/SKILL.md" '---
+name: demo-skill
+description: Demo agent skill used by the eval fixtures.
+metadata:
+  version: "0.1.0"
+  date: "2026-01-01"
+---
+
+# Demo Skill
+
+Fixture for the Agent Skill repository ecosystem.
+'
+# 这一行是 F3 的判别项：只有 X 占位符（8 个连续 X），没有真正的待办标记。
+write_file "$p/evals/run_evals.ps1" '#!/usr/bin/env pwsh
+#Requires -Version 7.0
+$BASE_TMP = [System.IO.Path]::GetTempPath()
+$RUN_DIR = (mktemp -d "$BASE_TMP/attention-eval-runs-XXXXXXXX")
+Write-Host "run_evals ok"
+'
+write_file "$p/scripts/smoke_test.ps1" '#!/usr/bin/env pwsh
+#Requires -Version 7.0
+Write-Host "smoke_test ok"
+'
+add_commit "$p" 'feat: demo agent skill'
+register_fixture 'F21' 'agent skill repo (SKILL.md + bundled evals)' "$p" 'version_files has SKILL.md=0.1.0 (consistent=true); test_commands has run_evals+smoke_test; todo_fixme=[] (an X-placeholder run must not match the marker pattern)'
 
 # ============ 输出 ============
 COUNT=${#IDS[@]}

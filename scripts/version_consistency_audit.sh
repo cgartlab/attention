@@ -63,7 +63,7 @@ while IFS= read -r f; do
   case "$base" in
     package.json|package-lock.json|npm-shrinkwrap.json|Cargo.toml|Cargo.lock|pyproject.toml|\
 setup.py|setup.cfg|pom.xml|gradle.properties|build.gradle|build.gradle.kts|Directory.Build.props|\
-composer.json|pubspec.yaml|mix.exs|MODULE.bazel|DESCRIPTION|Chart.yaml|Package.swift|go.mod) keep=1;;
+composer.json|pubspec.yaml|mix.exs|MODULE.bazel|DESCRIPTION|Chart.yaml|Package.swift|go.mod|SKILL.md) keep=1;;
     *.csproj|*.gemspec|*.opam) keep=1;;
   esac
   case "$f" in lib/*version.rb) keep=1;; esac
@@ -151,6 +151,50 @@ add_vf() {
 }
 
 go_present=false; pkg_count=0; py_count=0; cargo_ws=false; pkg_dirs=""; inherited_paths=""
+
+# SKILL.md（Agent Skill 仓库）：技能版本号写在 YAML frontmatter 里。
+# 只为这一处做**最简单的** YAML 解析（不引 YAML 库、不依赖外部解析器）：
+#   · 文件必须以 `---` 开头（frontmatter），以 `---` 结束；
+#   · 取「顶层 `metadata:` 块内、恰好缩进两格的 `version:`」；
+#   · 没有则回退「顶层的 `version:`」；
+#   · 值去首尾空白、去成对引号（"0.1.0" / '0.1.0' / 0.1.0 都读 0.1.0）。
+# 为什么必须识别：Skill 仓库的真正版本号就在这里，不进清单会让 version_files=[]
+# 且 consistent=null —— 等于巡不到自己的版本（实测本仓库即如此）。
+skill_frontmatter_version() {
+  awk '
+    function unq(s) {
+      sub(/\r$/, "", s)
+      sub(/^[[:space:]]+/, "", s)
+      sub(/[[:space:]]+$/, "", s)
+      if (length(s) >= 2) {
+        q = sprintf("%c", 39)
+        c1 = substr(s, 1, 1); c2 = substr(s, length(s), 1)
+        if ((c1 == "\"" && c2 == "\"") || (c1 == q && c2 == q)) s = substr(s, 2, length(s) - 2)
+      }
+      return s
+    }
+    NR == 1 {
+      if ($0 !~ /^---[[:space:]]*$/) exit
+      next
+    }
+    $0 ~ /^---[[:space:]]*$/ { exit }
+    /^[[:space:]]*$/ { next }
+    /^[[:space:]]*#/ { next }
+    # 顶层键（无缩进）：metadata: 开启块；顶层 version: 作回退值
+    /^[^[:space:]]/ {
+      in_meta = 0
+      if ($0 ~ /^metadata:[[:space:]]*$/) { in_meta = 1; next }
+      if ($0 ~ /^version[[:space:]]*:/) { v = $0; sub(/^version[[:space:]]*:[[:space:]]*/, "", v); top = unq(v) }
+      next
+    }
+    # 恰好两格缩进的键（三格及以上视为更深层级，忽略）
+    /^  [^[:space:]]/ {
+      if (in_meta && $0 ~ /^  version[[:space:]]*:/) { v = $0; sub(/^  version[[:space:]]*:[[:space:]]*/, "", v); meta = unq(v) }
+      next
+    }
+    END { v = (meta != "" ? meta : top); if (v != "") print v }
+  ' "$1" 2>/dev/null
+}
 while IFS= read -r f; do
   [ -n "$f" ] || continue
   base=${f##*/}
@@ -202,6 +246,7 @@ while IFS= read -r f; do
     Chart.yaml) add_vf "$f" helm "$(grab_after_colon "$f" '^[[:space:]]*version[[:space:]]*:')" ;;
     *.opam) add_vf "$f" ocaml "$(grab_q "$f" '^[[:space:]]*version[[:space:]]*:')" ;;
     Package.swift) add_vf "$f" swift "$(grab_q "$f" 'version[[:space:]]*=[[:space:]]*')" ;;
+    SKILL.md) add_vf "$f" agent-skill "$(skill_frontmatter_version "$f")" ;;
     go.mod) go_present=true ;;
   esac
   case "$f" in lib/*version.rb) add_vf "$f" ruby "$(grab_q "$f" '[Vv][Ee][Rr][Ss][Ii][Oo][Nn][[:space:]]*=')" ;; esac

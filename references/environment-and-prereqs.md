@@ -24,7 +24,7 @@
 - **有 remote 但不可达**（第三种情况，别和"无 remote"混为一谈）：`git fetch`/`git push` 失败，或 `remote_reachable=false`，或 `warnings[]` 含 `remote-unreachable` → 照常产出 PR/MR 就绪产物 + 手动指引，并**明确告诉用户"没连上远程"**；不重试超过 2 次、不换协议绕过。细则见 `pr-and-remote-hosts.md`。
 
 ## 4. gh 鉴权
-- `gh auth status`。
+- **登录态用本地探测**：`gh auth token`（只读本地凭据，**不联网**；退出码 0 = 已登录）。**不要用 `gh auth status` 判定登录态**——它会做网络检查，抖动时会被读成"未登录"（`pr_available=false`），等于把"没查成"讲成"没有"（实测：代理指向死端口时 `gh auth status` rc=1 而 `gh auth token` rc=0）。宿主不匹配同样用本地判定：`gh auth token --hostname <remote host>` 非 0 且已登录 → `gh-host-mismatch`。需要给人看的账号信息（用户名/宿主）才用 `gh auth status`，且其失败要记为"没查成"。
 - 未登录或非活动 → 标记 `pr_available=false`，继续其余流程，到开 PR 处给手动指引。
 - 多账户：确认活动账户匹配 remote owner，不匹配时提示（`gh_query_state` 会反映为查询不可用）。
 

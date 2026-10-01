@@ -1,7 +1,7 @@
 #Requires -Version 7.0
 <#
 .SYNOPSIS
-  生成 attention 采集脚本的 19 个测试 fixture（F1-F19）。
+  生成 attention 采集脚本的 21 个测试 fixture（F1-F21）。
 .DESCRIPTION
   契约见 references/scan-recipes.md；断言表见 evals/script-assertions.json。
   生成目录默认在系统临时目录下的 attention-evals/（可用 -OutDir 覆盖）。
@@ -269,10 +269,32 @@ Register-Fixture 'F18' 'local main merged, origin/main stale' $p 'local base=mai
 
 $p = New-FixtureRepo 'F19-base-unverified'
 Set-FileContent -Path (Join-Path $p 'a.txt') -Content "base`n"
+# 关键判别项：必须有**核心文档**（否则 docs_stale_candidates 恒为空，"变更集为空 -> 仍须为 []"
+# 这条断言就没有判别力——什么文档都没有时它本来就空）。README.md 提交进去，工作树保持干净。
+Set-FileContent -Path (Join-Path $p 'README.md') -Content "# nobase`n`nLibrary.`n"
 Add-Commit -Repo $p -Message 'feat: base'
 # 有 remote，但没有 refs/remotes/origin/<default> —— 远程基准无从验证
 & git -C $p remote add origin 'https://127.0.0.1:1/github.com/team/nobase.git' 2>&1 | Out-Null
-Register-Fixture 'F19' 'remote without origin/<default>' $p 'remote_base_unverified=true + remote-base-unverified warning'
+Register-Fixture 'F19' 'remote without origin/<default>' $p 'remote_base_unverified=true + remote-base-unverified warning; changeset empty + has core docs -> docs_stale_candidates=[]'
+
+$p = New-FixtureRepo 'F20-local-only'
+Set-FileContent -Path (Join-Path $p 'README.md') -Content "# local`n`nPure local repository: it has no remote at all.`n"
+Set-FileContent -Path (Join-Path $p 'src/a.js') -Content "exports.a=1;`n"
+Add-Commit -Repo $p -Message 'feat: initial local work'
+Set-FileContent -Path (Join-Path $p 'src/a.js') -Content "exports.a=2;`n"
+Add-Commit -Repo $p -Message 'feat: second local commit'
+# 完全没有 remote（既没有 origin，也没有任何其它 remote），工作树干净。
+# 判别项：没有远程就没有「未推送分支/未推送提交」这一概念——unpushed_branches 必须 []、
+# unpushed_commits 保持 null 但语义是「不适用」，并加 no-remote 警告。
+Register-Fixture 'F20' 'local-only repo (no remote at all)' $p 'has_remote=false; unpushed_branches=[]; unpushed_commits=null + no-remote warning; branch audit: remote_base_unverified=true, remote_merge_base=null, remote_reachable=false'
+
+$p = New-FixtureRepo 'F21-skill-repo'
+Set-FileContent -Path (Join-Path $p 'SKILL.md') -Content "---`nname: demo-skill`ndescription: Demo agent skill used by the eval fixtures.`nmetadata:`n  version: `"0.1.0`"`n  date: `"2026-01-01`"`n---`n`n# Demo Skill`n`nFixture for the Agent Skill repository ecosystem.`n"
+# 这一行是 F3 的判别项：只有 X 占位符（8 个连续 X），没有真正的待办标记。
+Set-FileContent -Path (Join-Path $p 'evals/run_evals.ps1') -Content "#!/usr/bin/env pwsh`n#Requires -Version 7.0`n`$BASE_TMP = [System.IO.Path]::GetTempPath()`n`$RUN_DIR = (mktemp -d `"`$BASE_TMP/attention-eval-runs-XXXXXXXX`")`nWrite-Host `"run_evals ok`"`n"
+Set-FileContent -Path (Join-Path $p 'scripts/smoke_test.ps1') -Content "#!/usr/bin/env pwsh`n#Requires -Version 7.0`nWrite-Host `"smoke_test ok`"`n"
+Add-Commit -Repo $p -Message 'feat: demo agent skill'
+Register-Fixture 'F21' 'agent skill repo (SKILL.md + bundled evals)' $p 'version_files has SKILL.md=0.1.0 (consistent=true); test_commands has run_evals+smoke_test; todo_fixme=[] (an X-placeholder run must not match the marker pattern)'
 
 $summary = [pscustomobject]@{
   out_dir  = $OutDir

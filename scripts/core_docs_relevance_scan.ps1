@@ -162,7 +162,9 @@ foreach ($doc in $coreDocs) {
   }
   if ($refs.Count -gt 0) {
     $mentioning += [pscustomobject]@{ doc = $doc; references = @($refs) }
-  } elseif (-not $changedSet.Contains($doc)) {
+  } elseif ($changed.Count -gt 0 -and -not $changedSet.Contains($doc)) {
+    # 变更集为空时必须输出 []：什么都没改就谈不上「陈旧」（否则会把全部核心文档
+    # 都列出来，等于对着一个干净仓库刷十几条无意义提示）。
     $stale += $doc
   }
 }

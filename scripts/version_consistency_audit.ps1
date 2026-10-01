@@ -142,6 +142,39 @@ function Get-CargoLockVersion([string]$rootName, [string]$file) {
   if ($name -eq $rootName -and $ver) { return $ver }
   return $null
 }
+# SKILL.md（Agent Skill 仓库）：技能版本号写在 YAML frontmatter 里。
+# 只为这一处做**最简单的** YAML 解析（不引 YAML 库）：文件必须以 `---` 开头/结束，
+# 取「顶层 `metadata:` 块内、恰好缩进两格的 `version:`」，没有则回退顶层的 `version:`；
+# 值去首尾空白、去成对引号。为什么必须识别：Skill 仓库的真正版本号就在这里，不进清单
+# 会让 version_files=[] 且 consistent=null —— 等于巡不到自己的版本（实测本仓库即如此）。
+function Get-SkillFrontmatterVersion([string]$file) {
+  if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { return $null }
+  $lines = @(Get-Content -LiteralPath $file -ErrorAction SilentlyContinue)
+  if ($lines.Count -lt 1) { return $null }
+  if (([string]$lines[0]).TrimEnd("`r") -notmatch '^---\s*$') { return $null }
+  $top = $null; $yamlMeta = $null; $inMeta = $false
+  for ($i = 1; $i -lt $lines.Count; $i++) {
+    $line = ([string]$lines[$i]).TrimEnd("`r")
+    if ($line -match '^---\s*$') { break }
+    if ($line -match '^\s*$') { continue }
+    if ($line -match '^\s*#') { continue }
+    # 顶层键（无缩进）：metadata: 开启块；顶层 version: 作回退值
+    if ($line -match '^\S') {
+      $inMeta = $false
+      if ($line -match '^metadata:\s*$') { $inMeta = $true; continue }
+      if ($line -match '^version\s*:(.*)$') { $top = Clean-Val $Matches[1] }
+      continue
+    }
+    # 恰好两格缩进的键（三格及以上视为更深层级，忽略）
+    if ($line -match '^  [^\s]') {
+      if ($inMeta -and $line -match '^  version\s*:(.*)$') { $yamlMeta = Clean-Val $Matches[1] }
+      continue
+    }
+  }
+  if ($yamlMeta) { return $yamlMeta }
+  if ($top) { return $top }
+  return $null
+}
 function Test-SegExcluded([string]$p) {
   $s = "/$p/"
   # vendor/third_party/Pods/bower_components 必须在表里：第三方内嵌依赖常未被 .gitignore
@@ -289,7 +322,7 @@ foreach ($f in $pool) {
   $slash = $f.LastIndexOf('/')
   if ($slash -ge 0) { $base = $f.Substring($slash + 1) }
   $keep = $false
-  if ($base -cin @('package.json','package-lock.json','npm-shrinkwrap.json','Cargo.toml','Cargo.lock','pyproject.toml','setup.py','setup.cfg','pom.xml','gradle.properties','build.gradle','build.gradle.kts','Directory.Build.props','composer.json','pubspec.yaml','mix.exs','MODULE.bazel','DESCRIPTION','Chart.yaml','Package.swift','go.mod')) { $keep = $true }
+  if ($base -cin @('package.json','package-lock.json','npm-shrinkwrap.json','Cargo.toml','Cargo.lock','pyproject.toml','setup.py','setup.cfg','pom.xml','gradle.properties','build.gradle','build.gradle.kts','Directory.Build.props','composer.json','pubspec.yaml','mix.exs','MODULE.bazel','DESCRIPTION','Chart.yaml','Package.swift','go.mod','SKILL.md')) { $keep = $true }
   elseif ($base -clike '*.csproj' -or $base -clike '*.gemspec' -or $base -clike '*.opam') { $keep = $true }
   elseif ($f -clike 'lib/*version.rb') { $keep = $true }
   if ($keep) { $cand += $f }
@@ -394,6 +427,7 @@ foreach ($f in $cand) {
     'DESCRIPTION' { Add-VF $f 'r' (Grab-AfterColon $f '^Version[ \t]*:') }
     'Chart.yaml' { Add-VF $f 'helm' (Grab-AfterColon $f '^[ \t]*version[ \t]*:') }
     'Package.swift' { Add-VF $f 'swift' (Grab-Q $f 'version[ \t]*=[ \t]*') }
+    'SKILL.md' { Add-VF $f 'agent-skill' (Get-SkillFrontmatterVersion $f) }
     'go.mod' { $script:goPresent = $true }
     default {
       if ($base -clike '*.csproj') {

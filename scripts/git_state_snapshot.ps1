@@ -211,7 +211,10 @@ if ($ccRaw -and [int]::TryParse($ccRaw, [ref]$cc)) {
   }
 }
 
-# 未推送提交：origin/<default> 优先，其次 upstream；都没有 -> null（不可判定）
+# 未推送提交：origin/<default> 优先，其次 upstream；都没有 -> null。
+# null 有两种语义，必须靠 has_remote 区分：has_remote=false -> **不适用**（没有远程可推，
+# 加 no-remote 警告）；has_remote=true 但取不到可比 ref -> **不可判定**。不得输出 []。
+if (-not $hasRemote) { Add-Warn 'no-remote' }
 $unpushed = $null
 $range = $null
 if ($default -and (GitOk @('rev-parse','--verify',"refs/remotes/origin/$default"))) {
@@ -223,20 +226,26 @@ if ($range) {
   $unpushed = @(GitOut @('log','--oneline',$range) | Where-Object { $_ -ne '' })
 }
 
-# 未推送分支：tip 不被任何 refs/remotes/* 覆盖的本地分支
-$unpushedShas = @(GitOut @('rev-list','--branches','--not','--remotes'))
-$hsU = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-foreach ($s in $unpushedShas) { if ($s) { [void]$hsU.Add(([string]$s).Trim()) } }
-$ub = New-Object System.Collections.Generic.List[string]
-foreach ($line in @(GitOut @('for-each-ref','--format=%(objectname) %(refname:short)','refs/heads'))) {
-  if (-not $line) { continue }
-  $sp = $line.IndexOf(' ')
-  if ($sp -lt 1) { continue }
-  $sha = $line.Substring(0, $sp)
-  $name = $line.Substring($sp + 1).Trim()
-  if ($name -and $hsU.Contains($sha)) { $ub.Add($name) }
+# 未推送分支：tip 不被任何 refs/remotes/* 覆盖的本地分支。
+# **has_remote=false 时必须输出 []**：没有远程就没有「未推送分支」这一概念。
+# 否则一个完全干净的纯本地仓库会输出 ["main"]，配合判定条款会被判成脏态，
+# 进而去尝试推送一个不存在的远程（实测本仓库即如此）。
+$unpushedBranches = @()
+if ($hasRemote) {
+  $unpushedShas = @(GitOut @('rev-list','--branches','--not','--remotes'))
+  $hsU = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+  foreach ($s in $unpushedShas) { if ($s) { [void]$hsU.Add(([string]$s).Trim()) } }
+  $ub = New-Object System.Collections.Generic.List[string]
+  foreach ($line in @(GitOut @('for-each-ref','--format=%(objectname) %(refname:short)','refs/heads'))) {
+    if (-not $line) { continue }
+    $sp = $line.IndexOf(' ')
+    if ($sp -lt 1) { continue }
+    $sha = $line.Substring(0, $sp)
+    $name = $line.Substring($sp + 1).Trim()
+    if ($name -and $hsU.Contains($sha)) { $ub.Add($name) }
+  }
+  $unpushedBranches = UniqSort $ub
 }
-$unpushedBranches = UniqSort $ub
 
 $result = [ordered]@{
   is_git              = $true

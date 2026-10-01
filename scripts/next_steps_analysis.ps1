@@ -129,18 +129,23 @@ $isGithub = $false
 if ($remoteHost -eq 'github.com' -or ($remoteHost -and $remoteHost.EndsWith('.github.com', [System.StringComparison]::OrdinalIgnoreCase))) { $isGithub = $true }
 $remoteUrlMasked = $null
 if ($remoteUrl) { $remoteUrlMasked = MaskUrl $remoteUrl }
+# gh_authed：**本地凭据探测**——`gh auth token` 只读本地凭据存储、不联网，退出码确定性。
+# 绝不用 `gh auth status`：它会做 API 校验，并发/机器繁忙时偶发非 0，会把"没查成"
+# 写成事实性的"未认证"，并连带翻转 gh-host-mismatch（违反 §5"没查成必须留痕"）。
+# gh 不存在时沿用原降级口径：gh_authed=false，不新增警告码。
 $ghAuthed = $false
-$ghHosts = @()
 $ghExe = (Get-Command gh -ErrorAction SilentlyContinue).Source
 if ($ghExe) {
-  $ghStatus = @(& $ghExe auth status 2>&1 | ForEach-Object { [string]$_ })
-  if ($LASTEXITCODE -eq 0) { $ghAuthed = $true }
-  foreach ($l in $ghStatus) {
-    if ($l -match 'Logged in to ([A-Za-z0-9._-]+)') { $ghHosts += $Matches[1] }
+  & $ghExe auth token *> $null
+  if ($LASTEXITCODE -eq 0) {
+    $ghAuthed = $true
+    # 宿主不匹配 = 远端 host 在本地凭据里没有 token（同样只读本地、不联网）。
+    # 网络可达性是另一件事，由 remote_reachable / gh_query_state 表达。
+    if ($remoteHost) {
+      & $ghExe auth token --hostname $remoteHost *> $null
+      if ($LASTEXITCODE -ne 0) { Add-Warn 'gh-host-mismatch' }
+    }
   }
-}
-if ($ghAuthed -and $remoteHost -and $ghHosts.Count -gt 0) {
-  if (-not ($ghHosts -ccontains $remoteHost)) { Add-Warn 'gh-host-mismatch' }
 }
 
 # 查询失败 -> null + gh-query-failed（绝不输出 []，那会被读成"确实没有开放 issue/PR"）
@@ -161,7 +166,9 @@ if ($isGithub -and $ghAuthed) {
 }
 
 # --untracked 必须放在 pattern 之前；排除表按仓库根锚定（:(exclude,top)）
-$tout = @(GitOut @('grep','--untracked','-n','-E','-e','TODO|FIXME|XXX|HACK','--','.',
+# XXX 必须排除连续的 X 串（mktemp 模板里的 XXXXXX/XXXXXXXX 不是待办）：
+# `(^|[^X])XXX([^X]|$)` 只命中「左右都不是 X」的孤立 XXX。
+$tout = @(GitOut @('grep','--untracked','-n','-E','-e','TODO|FIXME|HACK|(^|[^X])XXX([^X]|$)','--','.',
   ':(exclude,top)*.md',':(exclude,top)*.markdown',':(exclude,top)*.json',':(exclude,top)*.rst',
   ':(exclude,top)scripts/next_steps_analysis.ps1',':(exclude,top)scripts/next_steps_analysis.sh'))
 $grc = $LASTEXITCODE
@@ -209,6 +216,16 @@ if (Test-Path -LiteralPath 'pyproject.toml') {
     if ($py -cmatch $t) { Add-TestCmd $t $t }
   }
 }
+# 本 skill 自带的测试入口：evals/run_evals.* 与 scripts/smoke_test.*。
+# 「这个项目有没有测试」的真实答案就在这两个文件上，不识别就等于看不见（实测本仓库
+# test_commands=[]）。script 给出对应实现路径：两套都存在时**确定性**地选 .sh
+#（不按「能否执行」探测——探测结果会随运行本脚本的 shell 变化，反而破坏 .sh/.ps1 parity）。
+function Add-SkillTestCmd([string]$name, [string]$basePath) {
+  if (Test-Path -LiteralPath "$basePath.sh" -PathType Leaf) { Add-TestCmd $name "$basePath.sh" }
+  elseif (Test-Path -LiteralPath "$basePath.ps1" -PathType Leaf) { Add-TestCmd $name "$basePath.ps1" }
+}
+Add-SkillTestCmd 'run_evals' 'evals/run_evals'
+Add-SkillTestCmd 'smoke_test' 'scripts/smoke_test'
 
 # 默认分支探测
 $default = $null

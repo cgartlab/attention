@@ -733,6 +733,175 @@
       "op": "equals",
       "value": "main",
       "note": "本地基准不受远程缺失影响"
+    },
+    {
+      "id": "F19-core-docs-present",
+      "fixtures": [
+        "F19"
+      ],
+      "script": "core_docs_relevance_scan",
+      "impl": "*",
+      "path": "core_docs",
+      "op": "is_nonempty_array",
+      "note": "判别力前置条件：该 fixture 必须真有核心文档（README.md），否则下面那条「变更集为空 -> []」断言空洞为真"
+    },
+    {
+      "id": "F19-docs-stale-empty",
+      "fixtures": [
+        "F19"
+      ],
+      "script": "core_docs_relevance_scan",
+      "impl": "*",
+      "path": "docs_stale_candidates",
+      "op": "is_empty_array",
+      "note": "F2：变更集为空时不得输出「陈旧候选」——什么都改谈不上陈旧（此前会把全部核心文档都列出来）"
+    },
+    {
+      "id": "F20-no-remote",
+      "fixtures": [
+        "F20"
+      ],
+      "script": "git_state_snapshot",
+      "impl": "*",
+      "path": "has_remote",
+      "op": "is_false",
+      "note": "F1：纯本地仓库（完全没有 remote）"
+    },
+    {
+      "id": "F20-unpushed-branches-empty",
+      "fixtures": [
+        "F20"
+      ],
+      "script": "git_state_snapshot",
+      "impl": "*",
+      "path": "unpushed_branches",
+      "op": "is_empty_array",
+      "note": "F1：has_remote=false 时必须 []——没有远程就没有「未推送分支」这一概念（此前输出 [main]，会把干净仓库判成脏态）"
+    },
+    {
+      "id": "F20-unpushed-commits-null",
+      "fixtures": [
+        "F20"
+      ],
+      "script": "git_state_snapshot",
+      "impl": "*",
+      "path": "unpushed_commits",
+      "op": "is_null",
+      "note": "F1：保持 null，但 has_remote=false 时语义是「不适用」，与「不可判定」靠 has_remote 区分"
+    },
+    {
+      "id": "F20-no-remote-warning",
+      "fixtures": [
+        "F20"
+      ],
+      "script": "git_state_snapshot",
+      "impl": "*",
+      "path": "warnings",
+      "op": "contains",
+      "value": "no-remote",
+      "note": "F1：新增 no-remote 警告，让「不适用」在输出里可见"
+    },
+    {
+      "id": "F20-branch-unverified",
+      "fixtures": [
+        "F20"
+      ],
+      "script": "branch_cleanup_audit",
+      "impl": "*",
+      "path": "remote_base_unverified",
+      "op": "is_true",
+      "note": "无 remote 时远程基准无从验证"
+    },
+    {
+      "id": "F20-branch-remote-base-null",
+      "fixtures": [
+        "F20"
+      ],
+      "script": "branch_cleanup_audit",
+      "impl": "*",
+      "path": "remote_merge_base",
+      "op": "is_null"
+    },
+    {
+      "id": "F20-branch-unreachable",
+      "fixtures": [
+        "F20"
+      ],
+      "script": "branch_cleanup_audit",
+      "impl": "*",
+      "path": "remote_reachable",
+      "op": "is_false",
+      "note": "「没查成」不得写成「没有」：remote_reachable=false 表明远端结论不可信"
+    },
+    {
+      "id": "F21-skill-md-file",
+      "fixtures": [
+        "F21"
+      ],
+      "script": "version_consistency_audit",
+      "impl": "*",
+      "path": "version_files[].file",
+      "op": "contains",
+      "value": "SKILL.md",
+      "note": "F4a：SKILL.md 必须进版本承载文件清单（否则 Skill 仓库巡不到自己的版本）"
+    },
+    {
+      "id": "F21-skill-md-version",
+      "fixtures": [
+        "F21"
+      ],
+      "script": "version_consistency_audit",
+      "impl": "*",
+      "path": "version_files[].version",
+      "op": "contains",
+      "value": "0.1.0",
+      "note": "F4a：取 YAML frontmatter 的 metadata.version（两个空格缩进的块内）"
+    },
+    {
+      "id": "F21-consistent",
+      "fixtures": [
+        "F21"
+      ],
+      "script": "version_consistency_audit",
+      "impl": "*",
+      "path": "consistent",
+      "op": "is_true",
+      "note": "F4a：识别到 SKILL.md 后版本集为 {0.1.0}，一致"
+    },
+    {
+      "id": "F21-testcmd-run-evals",
+      "fixtures": [
+        "F21"
+      ],
+      "script": "next_steps_analysis",
+      "impl": "*",
+      "path": "test_commands[].name",
+      "op": "contains",
+      "value": "run_evals",
+      "note": "F4b：存在 evals/run_evals.<ext> 时必须识别为本 skill 自带的测试入口"
+    },
+    {
+      "id": "F21-testcmd-smoke-test",
+      "fixtures": [
+        "F21"
+      ],
+      "script": "next_steps_analysis",
+      "impl": "*",
+      "path": "test_commands[].name",
+      "op": "contains",
+      "value": "smoke_test",
+      "note": "F4b：存在 scripts/smoke_test.<ext> 时必须识别为本 skill 自带的测试入口"
+    },
+    {
+      "id": "F21-todo-empty",
+      "fixtures": [
+        "F21"
+      ],
+      "script": "next_steps_analysis",
+      "impl": "*",
+      "path": "todo_fixme",
+      "op": "is_empty_array",
+      "note": "F3 判别项：mktemp 模板里的 XXXXXXXX 是 X 占位符，不得被 XXX 模式命中（该 fixture 只有这一种 X 串，没有真 TODO）"
     }
   ]
 }

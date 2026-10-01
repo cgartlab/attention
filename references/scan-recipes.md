@@ -14,7 +14,7 @@
 - 退出码：`0` = 已产出完整 JSON（含 `is_git=false` 的正常短路）；`2` = 内部错误（此时仍须输出 `{"is_git":false,"error":"<原因>"}`，不得输出半截 JSON）。
 - **颜色**：所有 git 调用一律 `-c color.ui=never`。用户全局 `color.ui=always` 会注入 ANSI 转义，使 `--merged` 分支名比对整体失效（静默漏报剪枝候选）。
 - **失败可见**：任何 git/gh 子命令失败、跳过或降级，必须记入 `warnings[]` 或把相应字段置 `null`。**禁止**把"没查成"输出成与"确实为空"同形的 `[]`。
-- **`warnings[]`**（各脚本均可输出，默认 `[]`）：机器可读短码，至少含 `gh-query-failed`、`remote-unreachable`、`no-version-files`、`partial-parse`、`head-unborn`、`gh-host-mismatch`、`remote-base-unverified`、`rulesets-unavailable`、`protect-config-unreadable`。
+- **`warnings[]`**（各脚本均可输出，默认 `[]`）：机器可读短码，至少含 `gh-query-failed`、`remote-unreachable`、`no-remote`、`no-version-files`、`partial-parse`、`head-unborn`、`gh-host-mismatch`、`remote-base-unverified`、`rulesets-unavailable`、`protect-config-unreadable`。
 
 ### 路径与缺失语义（两套实现必须逐字一致）
 
@@ -50,8 +50,8 @@ staged(`git diff --cached --name-only --no-renames -z`) ∪ unstaged(`git diff -
 - staged / unstaged / untracked（见"变更集"，untracked 仅计未被 .gitignore 排除者）
 - `git stash list` → stash_count（行数）
 - recent_changed_files：`count = git rev-list --count --first-parent HEAD`（**必须 `--first-parent`**：不带它时侧分支提交也被计入，而 `HEAD~n` 只沿第一父链，两者不一致会让 `HEAD~n` 不存在）；**`n = min(10, count-1)`**；n>0 则 `git diff --name-only --no-renames "HEAD~n..HEAD"`；**n==0（仅根提交）时**回退 `git show --name-only --format= HEAD`。历史写法 `min(10, count)` 会让提交数 ≤10 或含合并提交的仓库静默变空（审计发现的契约缺陷）
-- unpushed_commits：`origin/<default>` 存在 → `git log --oneline origin/<default>..HEAD`；否则有 upstream → `@{u}..HEAD`；**否则 null**（无任何可比远程 → 视为"不可判定"，不可输出 `[]`）
-- **unpushed_branches（新增）**：本地分支中 tip 不被任何 `refs/remotes/*` 覆盖者 → `git for-each-ref --format='%(refname:short)' refs/heads` 减去 `git branch -r --contains`/`rev-list --branches --not --remotes` 的结果。用途：Phase 2 脏/净判定的第三条判据此前**没有任何脚本支撑**，模型只能自己手搓 git 命令
+- unpushed_commits：`origin/<default>` 存在 → `git log --oneline origin/<default>..HEAD`；否则有 upstream → `@{u}..HEAD`；**否则 null**。null 有两种语义，必须靠 `has_remote` 区分：`has_remote=false` → **不适用**（没有远程可推，加 `no-remote` 警告）；`has_remote=true` 但取不到可比 ref → **不可判定**。不得输出 `[]`（那会被读成"确实没有未推送提交"）
+- **unpushed_branches**：本地分支中 tip 不被任何 `refs/remotes/*` 覆盖者 → `git for-each-ref --format='%(refname:short)' refs/heads` 减去 `git branch -r --contains`/`rev-list --branches --not --remotes` 的结果。**`has_remote=false` 时必须输出 `[]`**：没有远程就没有"未推送分支"这一概念（实测：此前输出 `["main"]`，配合判定条款会把一个完全干净的纯本地仓库判成**脏态**，进而去尝试推送一个不存在的远程）
 
 **JSON**：`{is_git(bool), repo_root(str), has_remote(bool), remote_host(str|null), current_branch(str|null), detached(bool), head_short(str|null), upstream(str|null), ahead(int|null), behind(int|null), default_branch(str|null), default_branch_source(str), staged(str[]), unstaged(str[]), untracked(str[]), stash_count(int), recent_changed_files(str[]), unpushed_commits(str[]|null), unpushed_branches(str[]), warnings(str[])}`
 
@@ -101,6 +101,7 @@ staged(`git diff --cached --name-only --no-renames -z`) ∪ unstaged(`git diff -
 - `pom.xml` → jvm，`<version>`；`gradle.properties` → jvm，`^version\s*=\s*(.+)$`；`build.gradle(.kts)` → jvm，`version\s*=\s*['"]([^'"]+)`
 - `*.csproj` / `Directory.Build.props` → dotnet，`<Version>`/`<VersionPrefix>`
 - `*.gemspec` / `lib/**/version.rb` → ruby；`composer.json` → php；`pubspec.yaml` → dart；`mix.exs` → elixir；`MODULE.bazel` → bazel；`DESCRIPTION` → r；`Chart.yaml` → helm；`*.opam` → ocaml；`Package.swift` → swift
+- **`SKILL.md`（Agent Skill 仓库）** → ecosystem `agent-skill`，取 YAML frontmatter 里 `metadata.version`（无则顶层 `version`）。**为什么**：Skill 仓库的真正版本号就在 frontmatter 里，不进清单会让 `version_files=[]`+`consistent=null`，等于巡不到自己的版本（实测本仓库即如此）
 - `go.mod` 存在 → go_mod_present=true（go.mod 本身**不含**版本号，标签才是版本源）
 - 值一律剥离行尾 CR 后再写入 JSON
 
@@ -130,7 +131,7 @@ staged(`git diff --cached --name-only --no-renames -z`) ∪ unstaged(`git diff -
 - changed_basenames = 变更文件 basename 去重排序
 - 每个核心文档：读内容；对每个 changed basename 做**字面匹配（不区分大小写，正则转义）** → `references[]`
 - `docs_mentioning_changes`（**原 `docs_needing_update` 更名**）：`[{doc, references[]}]`——**只表示"该文档提到了这些变更文件名"**。它为空**不代表**文档已同步：文档从不引用文件名（只写函数名/命令名）的仓库里它恒为空，而那恰恰是最该补文档的情况
-- `docs_stale_candidates`（**新增**）：`exists=true`、未出现在变更集、且未提及任何变更文件的核心文档 → `str[]`。语义为"本次改动没有碰它、它也没提到改动过的文件，请人工确认是否需要更新"
+- `docs_stale_candidates`：`exists=true`、未出现在变更集、且未提及任何变更文件的核心文档 → `str[]`。语义为"本次改动没有碰它、它也没提到改动过的文件，请人工确认是否需要更新"。**变更集为空时必须输出 `[]`**：什么都没改就谈不上"陈旧"（实测：此前会把全部核心文档都列出来，等于对着一个干净仓库刷 12 条无意义提示）
 
 **JSON**：`{is_git(bool), core_docs([{file,exists(bool)}]), changed_files(str[]), changed_basenames(str[]), docs_mentioning_changes([{doc,references(str[])}]), docs_stale_candidates(str[]), warnings(str[])}`
 
@@ -144,15 +145,16 @@ staged(`git diff --cached --name-only --no-renames -z`) ∪ unstaged(`git diff -
 **git 命令**：
 - `git -c color.ui=never log --oneline -n 15` → recent_commits
 - `git remote -v` → 解析出 remote 主机名：**is_github 判定按主机名**（`github.com` 或其子域），不得对整条 URL 做子串匹配（路径里含 `github.com` 的自建 GitLab 会被误判成 GitHub，进而驱动 `gh pr create`）；`remote_url_masked` = 脱敏后的 URL（`scheme://***@host/path`，去掉 userinfo 中的凭据）
-- `gh` 可用且 `gh auth status` 成功 → gh_authed=true；**gh 成功但宿主不匹配该 remote → `gh-host-mismatch` 警告**
+- `gh_authed`：**本地凭据探测**——以 `gh auth token` 的**退出码**为准（它只读本地凭据存储、不联网，确定性）。**不得使用会联网的 `gh auth status` 作为该字段依据**，因为网络抖动/并发繁忙会被写成事实性的"未认证"（违反本节"没查成必须留痕"）。字段仍为 `bool`（本地凭据在 = 已登录），**不是 `bool|null`**；`gh` 不存在或命令不可用 → `gh_authed=false`（沿用现有降级口径）。**网络可达性由 `remote_reachable` / `gh_query_state` 表达，与"是否登录"是两件事**；登录态的偶发网络失败不得改写这两个字段之外的登录结论
+- **宿主不匹配该 remote（本地凭据里没有该 host 的 token）→ `gh-host-mismatch` 警告**（同样只读本地，不联网）
 - is_github 且 gh_authed → `gh issue list --state open --limit 20`、`gh pr list --state open --limit 20`
   - 查询成功 → 数组（可为 `[]`）
   - 查询失败 → 字段置 **null** 且 `gh_query_state="unavailable"` + `gh-query-failed` 警告（**不得**输出 `[]`，那会被读成"没有开放 issue/PR"这一事实性否定）
   - 不适用（非 GitHub / 未登录）→ 字段 `null`，`gh_query_state="not-applicable"`
   - 成功 → `gh_query_state="ok"`
-- todo_fixme：`git grep --untracked -n -E -e 'TODO|FIXME|XXX|HACK' -- . ':(exclude)*.md' ':(exclude)*.markdown' ':(exclude)*.json' ':(exclude)*.rst' ':(exclude)scripts/next_steps_analysis.ps1' ':(exclude)scripts/next_steps_analysis.sh'`（前 30）。**`--untracked` 必须放在 pattern 之前**（写成 `git grep -E PAT --untracked` 会被 git 当成 revision，报 `unable to resolve revision`）；排除表写全、不省略；**不排除 `*.txt`**——文本文件里的 TODO 同样是有效信号
+- todo_fixme：`git grep --untracked -n -E -e 'TODO|FIXME|XXX|HACK' -- . ':(exclude)*.md' ':(exclude)*.markdown' ':(exclude)*.json' ':(exclude)*.rst' ':(exclude)scripts/next_steps_analysis.ps1' ':(exclude)scripts/next_steps_analysis.sh'`（前 30）。pattern 为 `TODO|FIXME|HACK|(^|[^X])XXX([^X]|$)`：**`XXX` 必须排除连续的 X 串**，否则会命中 `mktemp` 模板里的 `XXXXXX`/`XXXXXXXX` 占位符（实测本仓库 8 条命中里有 2 条是这种假阳性）。**`--untracked` 必须放在 pattern 之前**（写成 `git grep -E PAT --untracked` 会被 git 当成 revision，报 `unable to resolve revision`）；排除表写全、不省略；**不排除 `*.txt`**——文本文件里的 TODO 同样是有效信号
 - `git for-each-ref --format='%(refname:short)%09%(committerdate:iso-strict)' refs/heads` → branches `[{branch,last_commit}]`
-- test_commands：`package.json` scripts 的 test/lint/build/check/typecheck/format → `{name,script}`（script 为**完整命令串**，含转义引号，不得截断）；Makefile 目标 test/lint/build/check → `make <t>`；pyproject.toml 含 pytest/ruff/mypy → 该名
+- test_commands：`package.json` scripts 的 test/lint/build/check/typecheck/format → `{name,script}`（script 为**完整命令串**，含转义引号，不得截断）；Makefile 目标 test/lint/build/check → `make <t>`；pyproject.toml 含 pytest/ruff/mypy → 该名；**另外识别"本 skill 自带的测试入口"**：`evals/run_evals.ps1|sh` → `{name:"run_evals"}`、`scripts/smoke_test.ps1|sh` → `{name:"smoke_test"}`（脚本按探测到的 shell 给出对应实现）。**为什么**：采用本 skill 的仓库其真实性测试入口就是这两个（实测本仓库 `test_commands=[]`，"这项目有没有测试"看不见）
 - behind_default：`origin/<default>` 存在则 `git rev-list --count origin/<default>..HEAD`；否则 null
 - missing_core_docs：顶层**普通文件**名前缀精确匹配 `README|CHANGELOG|LICENSE|AGENTS|CONTRIBUTING`（大小写敏感性两套实现必须一致：统一**区分大小写**，与 git 在 Linux 上的行为对齐），缺失者按该顺序输出
 

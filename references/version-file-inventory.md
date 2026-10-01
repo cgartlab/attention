@@ -67,6 +67,13 @@
 | C/C++ | `CMakeLists.txt` | `project(... VERSION x.y.z)` | 常见 | 也可能拆到 `version.h` / `VERSION` 文件 |
 | 通用兜底 | `VERSION`、`version.txt` | 纯文本版本串 | 可选 | 存在即纳入核对 |
 
+## Agent Skill / 插件仓库
+
+| 生态 | 文件 | 字段位置 | 备注 |
+|---|---|---|---|
+| agent-skill | `SKILL.md` | YAML frontmatter 的 `metadata.version`（无则顶层 `version`） | **Skill 仓库的真实版本号就在这里**；不纳入清单会让 `version_files=[]`、`consistent=null`，等于巡不到自己的版本（实测本仓库即如此） |
+| claude-plugin | `.claude-plugin/plugin.json` | 顶层 `version` | 插件市场分发用 |
+| — | `VERSION` / `version.txt` | 纯文本 | 见"其他生态"的通用兜底 |
 ## 结论要点（判定时的三条硬提醒）
 
 1. **没有工具能自动覆盖所有语言**——上表是核对清单；脚本只认常见路径，剩下靠模型按 `git ls-files` 自己找。找不到版本文件时如实说"没有版本文件"（`consistent=null`），**不要创建**假的版本文件。

@@ -60,8 +60,10 @@ while IFS= read -r doc; do
   refs_out+="]"
   if [ $has_ref -eq 1 ]; then
     mention_out+="${mention_sep}{\"doc\":\"$(jes "$doc")\",\"references\":$refs_out}"; mention_sep=","
-  elif ! printf '%s\n' "$changed" | grep -Fxq -- "$doc"; then
-    # 未出现在变更集、也没提到任何变更文件的核心文档 -> 请人工确认是否需要更新
+  elif [ -n "$changed" ] && ! printf '%s\n' "$changed" | grep -Fxq -- "$doc"; then
+    # 未出现在变更集、也没提到任何变更文件的核心文档 -> 请人工确认是否需要更新。
+    # **变更集为空时必须输出 []**：什么都没改就谈不上「陈旧」（否则会把全部核心文档
+    # 都列出来，等于对着一个干净仓库刷十几条无意义提示）。
     stale_raw+="$doc"$'\n'
   fi
 done <<< "$core_docs"
