@@ -6,6 +6,11 @@
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-01
+
+首次公开发布（此前未对外发布过任何版本，故本次发布涵盖自 2026-09-29 内部初版以来的全部工作）。
+
+
 ### Added
 - **发布流水线（商业级门禁与发布）**：新增 GitHub Actions 双 OS × 双 shell 门禁（`.github/workflows/ci.yml`：Windows 跑 pwsh runner、Linux 跑 bash runner，并含"非 git 目录必须判失败"的负例）；发布前只读闸门 `scripts/release_preflight.ps1|sh`（成对、判据一致：工作区干净 / 分支 / 版本一致性 / `[Unreleased]` / 三层校验 / 冒烟）；社区标准文件 `SECURITY.md`（含安全边界与私密漏洞上报）、`CONTRIBUTING.md`、`.github/CODEOWNERS`、`.github/dependabot.yml`。- **"立正巡自己"暴露并修掉的 4 处缺陷**（第三轮，来自对 attention 自身仓库跑一遍完整工作流）：
   - **无远程仓库被判成脏态**：`has_remote=false` 时 `unpushed_branches` 现输出 `[]`（没有远程就没有"未推送分支"概念），`unpushed_commits` 的 `null` 语义区分为**不适用**（新增 `no-remote` 警告），判定侧明确"纯本地仓库只看未提交改动"。此前会把一个完全干净的纯本地仓库判成脏态，然后去推送一个不存在的远程。
@@ -31,6 +36,13 @@
 - **生态调研**（`docs/ecosystem-survey.md` 主文档 + `docs/ecosystem-research/` 三份详报，共约 1700 行）：5 路并行取证 + 一手实测复核。覆盖同类 Agent Skill（git-repo-hygiene 等 23 个）、分支清理 CLI 9 个、版本/CHANGELOG 工具 7 个、守门工具链 8 个。含可信度分级（【实测】/【源码行】/【文档原文】/【待复核】/【推断】）与 4 级优先级可吸收清单（P0 3 项 / P1 6 项 / P2 8 项 / P3 5 项）。关键结论：立正是唯一具备 9 维能力全链路的 skill，但存在 3 项可实测证实的实现缺陷（`release_involved` 在 .ps1 恒 false、Cargo workspace 继承版本漏检、vendor/ 未排除）+ 1 项数据丢失风险（远程合并判定误用本地 base）。
 
 - **吸收 neat-freak 的治理机制（第三轮）**：`references/common-pitfalls.md` 新增第 7 条"同类问题第三次出现 → 散文约束不够，该上机制"——判据为同一规则被违反 3 次即属结构性缺口，应换成机器可判的 check/hook/test；同时明确**立正只建议、不擅自装钩子**（装钩子改用户开发流程，属本地变更需计划批准，且可能与其既有 pre-commit 框架冲突）与对应报告话术。
+
+- **发布流水线（商业级门禁与发布）**：新增 GitHub Actions 双 OS × 双 shell 门禁（`.github/workflows/ci.yml`：Windows 跑 pwsh runner、Linux 跑 bash runner，并含"非 git 目录必须判失败"的负例）；发布前只读闸门 `scripts/release_preflight.ps1|sh`（成对、判据一致：工作区干净 / 分支 / 版本一致性 / `[Unreleased]` / 三层校验 / 冒烟）；社区标准文件 `SECURITY.md`（含安全边界与私密漏洞上报）、`CONTRIBUTING.md`、`.github/CODEOWNERS`、`.github/dependabot.yml`。- 立正核心工作流：Phase 0 前置探测 -> Phase 1 状态快照 -> Phase 2 干净/脏态分流 -> Phase 3A 干净同步 / 3B 脏态修复 -> Phase 4 收尾报告。
+- 五个只读采集脚本（PowerShell）：git_state_snapshot / branch_cleanup_audit / version_consistency_audit / core_docs_relevance_scan / next_steps_analysis。
+- 七份 references：环境与前置探测、判断标准、分支模型与保护、核心文档同步、发行版本、PR 与远程宿主、自主与安全。
+- 四份 assets/templates：提交信息、PR body、CHANGELOG 条目、状态报告。
+- 四个 evals（clean-sync / dirty-wip-fix / version-bump-release / non-github-fallback）及断言。
+- LICENSE：CC-BY-NC-SA-4.0 完整 legalcode。
 
 ### Changed
 - **吸收 neat-freak（`KKKKhazix/khazix-skills` 的"洁癖"，21k★ / v3.0.0）的治理机制（第三轮，纯文档层，未触碰脚本与 JSON 契约）**，落地七处结构改进：
@@ -68,15 +80,3 @@
 - **不可测边界（诚实声明）**：远程操作、真实 GitHub PR 创建、`npx skills add` 安装链路在本开发环境**无法验证**——不把"跑不了"写成"通过"。详见 `docs/VALIDATION.md`。
 - `docs/ecosystem-survey.md` 的 P0–P3 可吸收清单尚未逐项落地。该调研独立实测确认的三项缺陷（`release_involved` 恒 false、`vendor/` 未排除、远程合并判定误用本地 base）已由本次 P6 修复覆盖；**Cargo workspace 成员继承版本**已在后续一轮补齐（`inherited_version_files` + `packages`，fixture F16 覆盖两种写法 `version.workspace = true` 与 `version = { workspace = true }`）。
 - `npx skills add cgartlab/attention` 安装路径需仓库推送到 GitHub 后方可验证；当前未推送（按计划推迟建远程）。
-
-## [0.1.0] - 2026-09-29
-
-首个可用版本。
-
-### Added
-- **发布流水线（商业级门禁与发布）**：新增 GitHub Actions 双 OS × 双 shell 门禁（`.github/workflows/ci.yml`：Windows 跑 pwsh runner、Linux 跑 bash runner，并含"非 git 目录必须判失败"的负例）；发布前只读闸门 `scripts/release_preflight.ps1|sh`（成对、判据一致：工作区干净 / 分支 / 版本一致性 / `[Unreleased]` / 三层校验 / 冒烟）；社区标准文件 `SECURITY.md`（含安全边界与私密漏洞上报）、`CONTRIBUTING.md`、`.github/CODEOWNERS`、`.github/dependabot.yml`。- 立正核心工作流：Phase 0 前置探测 -> Phase 1 状态快照 -> Phase 2 干净/脏态分流 -> Phase 3A 干净同步 / 3B 脏态修复 -> Phase 4 收尾报告。
-- 五个只读采集脚本（PowerShell）：git_state_snapshot / branch_cleanup_audit / version_consistency_audit / core_docs_relevance_scan / next_steps_analysis。
-- 七份 references：环境与前置探测、判断标准、分支模型与保护、核心文档同步、发行版本、PR 与远程宿主、自主与安全。
-- 四份 assets/templates：提交信息、PR body、CHANGELOG 条目、状态报告。
-- 四个 evals（clean-sync / dirty-wip-fix / version-bump-release / non-github-fallback）及断言。
-- LICENSE：CC-BY-NC-SA-4.0 完整 legalcode。
