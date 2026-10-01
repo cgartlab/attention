@@ -1,0 +1,7 @@
+# CODEOWNERS —— 默认所有路径由维护者审阅
+*       @cgartlab
+
+# 契约与评测基准单独标注（改动这些等于改行为/改基准）
+/references/            @cgartlab
+/evals/                 @cgartlab
+/SKILL.md               @cgartlab

@@ -1,0 +1,112 @@
+name: Release
+
+# 商业级发布：只由 tag 驱动，打 tag 前先在干净环境重跑全部门禁，
+# 并强制"tag 版本 == SKILL.md 里的版本"，然后构建产物、生成 Release 与校验和。
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '要发布的 tag（必须是已存在的 v* tag，例如 v0.2.0）'
+        required: true
+
+permissions:
+  contents: write      # 创建 Release / 上传产物
+  id-token: write      # 供 provenance 证明使用（private 仓库上若不可用会自动跳过该步）
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: 发布门禁（三层校验 + 冒烟 + 发布前自检）
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # 版本判定/生成说明需要完整历史
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 三层校验（bash runner，需 python 做严格 JSON）
+        run: bash evals/run_evals.sh --fixtures-dir "$RUNNER_TEMP/attention-evals-rel"
+
+      - name: 冒烟（双实现语义断言）
+        run: bash scripts/smoke_test.sh --repo .
+
+      - name: 发布前自检（只读闸门；tag 上为 detached HEAD，分支检查自然通过）
+        run: bash scripts/release_preflight.sh --repo .
+
+  publish:
+    name: 构建产物并发布
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 解析版本并校验 "tag == SKILL.md 版本"
+        id: ver
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+        run: |
+          set -euo pipefail
+          tag="${INPUT_TAG:-$REF_NAME}"
+          ver="${tag#v}"
+          # 唯一版本载体：SKILL.md frontmatter 的 metadata.version
+          skill_ver="$(awk '
+            /^---[[:space:]]*$/ { fm = !fm; next }
+            fm && /^metadata:[[:space:]]*$/ { in_meta = 1; next }
+            fm && in_meta && /^[^[:space:]]/ { in_meta = 0 }
+            fm && in_meta && /^[[:space:]]+version:[[:space:]]*/ {
+              gsub(/^[[:space:]]+version:[[:space:]]*/, ""); gsub(/["'"'"']/, ""); gsub(/[[:space:]]+$/, ""); print; exit
+            }' SKILL.md)"
+          echo "tag=$tag  version(from tag)=$ver  SKILL.md=$skill_ver"
+          if [ -z "$skill_ver" ]; then echo "::error::SKILL.md 里找不到 metadata.version"; exit 1; fi
+          if [ "$ver" != "$skill_ver" ]; then
+            echo "::error::tag 版本($ver) 与 SKILL.md 版本($skill_ver) 不一致——发布前必须先一致 bump"
+            exit 1
+          fi
+          echo "version=$skill_ver" >> "$GITHUB_OUTPUT"
+
+      - name: 构建 skill 包与校验和
+        run: |
+          set -euo pipefail
+          ver="${{ steps.ver.outputs.version }}"
+          mkdir -p dist
+          # 交付物 = skill 本体（SKILL.md + references + assets + scripts），不含开发/评测设施
+          zip -r "dist/attention-${ver}.zip" \
+            SKILL.md references assets scripts \
+            -x 'scripts/*.tmp' -x '*/.git/*'
+          ( cd dist && sha256sum "attention-${ver}.zip" > SHA256SUMS )
+          ls -l dist
+
+      - name: 生成 Release（自动说明 + 产物 + 校验和）
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          ver="${{ steps.ver.outputs.version }}"
+          tag="v${ver}"
+          gh release create "$tag" \
+            --title "attention v${ver}" \
+            --generate-notes \
+            "dist/attention-${ver}.zip" \
+            "dist/SHA256SUMS"
+
+      # provenance 证明：public 仓库可直接用；private 仓库上若组织策略不允许会失败，故允许跳过
+      - name: 产物来源证明（attestation，失败不阻塞发布）
+        continue-on-error: true
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/attention-*.zip

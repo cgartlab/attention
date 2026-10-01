@@ -1,0 +1,10 @@
+version: 2
+updates:
+  # Actions 版本是供应链风险面，每周看一眼
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "chore(ci)"
+    open-pull-requests-limit: 5

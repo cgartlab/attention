@@ -1,0 +1,76 @@
+name: CI
+
+# 商业级门禁：任何 push / PR 都必须过三层校验与冒烟，且两种 shell、两个 OS 各跑一遍。
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# 默认收紧权限：CI 只需要读代码
+permissions:
+  contents: read
+
+# 同一 ref 上只保留最新一次运行，省额度也避免陈旧结果误导
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    name: windows / pwsh
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 版本与依赖自述（排障用）
+        shell: pwsh
+        run: |
+          $PSVersionTable.PSVersion.ToString()
+          git --version
+          & 'C:\Program Files\Git\bin\bash.exe' -c 'bash --version | head -1'
+
+      # 三层校验：严格 JSON + .sh/.ps1 逐字段 parity + 断言表
+      # 该 runner 会自动探测 bash（Git for Windows）并同时跑两套实现
+      - name: run_evals（pwsh runner，含 bash 侧 parity）
+        shell: pwsh
+        run: pwsh -NoProfile -File evals/run_evals.ps1 -FixturesDir "$env:TEMP\attention-evals-ci"
+
+      - name: smoke_test（双实现语义断言）
+        shell: pwsh
+        run: pwsh -NoProfile -File scripts/smoke_test.ps1 --repo .
+
+  linux:
+    name: linux / bash
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 版本与依赖自述（排障用）
+        run: |
+          bash --version | head -1
+          python3 -V
+          git --version
+
+      # bash 侧 runner 需要 python 做严格 JSON 校验；缺了它会明确 SKIP 并退出 2（不会假装通过）
+      - name: run_evals（bash runner）
+        run: bash evals/run_evals.sh --fixtures-dir "$RUNNER_TEMP/attention-evals-ci-sh"
+
+      - name: smoke_test（bash 侧）
+        run: bash scripts/smoke_test.sh --repo .
+
+      - name: 冒烟必须对"非 git 目录"给出预期结论（负例）
+        run: |
+          set -e
+          tmp="$(mktemp -d)"
+          if bash scripts/smoke_test.sh --repo "$tmp"; then
+            echo "::error::非 git 目录上的冒烟竟然通过——负例失效"; exit 1
+          fi
+          echo "负例符合预期：非 git 目录被判失败"
