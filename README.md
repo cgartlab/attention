@@ -13,7 +13,7 @@
 - **干净态**（无未提交改动、无未推送提交，且用户只想同步）：拉取最新默认分支（`--ff-only`）、清理已合并的无价值分支、给出基于真实信号的下一步开发建议。
 - **有交付意图**（有未提交/未推送改动，或用户明说要发版/提 PR）：思考修复计划并自动执行，**提交前严格保证核心文档同步真实最新变化、发行版本号一致**，完成后开新 PR。
 
-> 状态干净不等于没事可做：用户说"版本号已改、要发版、提 PR"时，即使工作区干净也会走门槛与交付步骤（见 `SKILL.md` 的 Phase 2.5）。
+> 状态干净不等于没事可做：用户说"版本号已改、要发版、提 PR"时，即使工作区干净也会走门槛与交付步骤（见 `SKILL.md` 的 Phase 2 分流表）。
 
 ## 核心原则
 
@@ -28,10 +28,10 @@
 
 立正符合 [Agent Skills](https://agentskills.io) 开放标准（`SKILL.md` + `name`/`description` frontmatter），可装到兼容 harness（Claude Code、Codex、Cursor、OpenCode 等）。
 
-**⚠️ 当前状态：本仓库尚未推送到 GitHub**，因此下面这条 CLI 安装命令**现在用不了**——推送后即可用：
+**⚠️ 本仓库托管为 private（私有）**：`skills` CLI 与 skills.sh 徽章面向**公开**仓库，在私有仓库上用不了。请用下面的"手动安装"：
 
 ```bash
-npx skills add cgartlab/attention
+npx skills add cgartlab/attention   # 仅当仓库公开时可用；本仓库为 private，请走手动安装
 ```
 
 **手动安装**（现在就能用）：把本仓库克隆/复制到你所用 harness 的 skills 目录。各 harness 的默认位置：
@@ -51,7 +51,7 @@ attention/
 ├── scripts/            # 黑盒采集脚本：bash(.sh) 与 PowerShell(.ps1) 两套
 ├── references/         # 按需加载的判断细则（含 scan-recipes.md 契约）
 ├── assets/templates/   # 提交/PR/CHANGELOG/计划表/报告模板
-├── evals/              # 回归：19 个 fixture + 断言表 + 双实现 runner
+├── evals/              # 回归：21 个 fixture + 断言表 + 双实现 runner
 └── docs/               # 验证记录、质量审计、调研备忘
 ```
 
@@ -80,7 +80,7 @@ attention/
 仓库自带可复现的回归，不靠"人肉记得跑"：
 
 ```powershell
-# 三层校验：严格 JSON（RFC 8259）+ .sh/.ps1 逐字段 parity + 断言表（19 个 fixture、65 条断言）
+# 三层校验：严格 JSON（RFC 8259）+ .sh/.ps1 逐字段 parity + 断言表（21 个 fixture、81 条断言）
 pwsh -NoProfile -File evals/run_evals.ps1
 bash evals/run_evals.sh                 # bash 侧（建议有 python3）
 
@@ -93,11 +93,22 @@ bash scripts/smoke_test.sh --repo .
 
 **已验证 / 未验证（诚实边界）**：
 
-- ✅ 已验证：双实现在 19 个 fixture 上输出严格合法 JSON 且逐字段一致；非 git 目录、零提交仓库、detached HEAD、CRLF 版本文件、被忽略目录内的版本文件、宿主误判、颜色注入等边界；`--repo` 无效与漏值不再静默/挂死。
+- ✅ 已验证：双实现在 21 个 fixture 上输出严格合法 JSON 且逐字段一致；非 git 目录、零提交仓库、detached HEAD、CRLF 版本文件、被忽略目录内的版本文件、宿主误判、颜色注入等边界；`--repo` 无效与漏值不再静默/挂死。
 - ❌ 未验证：**任何远程操作**（本开发环境无法建立可用的远程传输：本地路径传输要过 shell、`git://` receive-pack 会挂死）；真实 GitHub PR 创建；`npx skills add` 安装链路（需先推送）；跨 harness 触发率。
 
 详见 `docs/VALIDATION.md`（验证记录）与 `docs/QUALITY-AUDIT.md`（本次审计查出的缺陷、复现方式与回归清单）。
 
+## 发布与版本
+
+- **版本策略**：未切 1.0 之前保持 `0.1.0`；未发布变更记入 `CHANGELOG.md` 的 `[Unreleased]`，是否切版由维护者决定（见 `AGENTS.md`）。
+- **版本载体**：唯一载体是 `SKILL.md` frontmatter 的 `metadata.version`（`version_consistency_audit` 已识别为 `agent-skill` 生态）。
+- **发布流程**：见 `docs/RELEASING.md`（CI 门禁、发布 PR、tag 保护、回滚）。
+- **发布前自检**（只读，失败即退出 1）：
+
+  ```powershell
+  pwsh -NoProfile -File scripts/release_preflight.ps1 --repo .
+  bash scripts/release_preflight.sh --repo .          # 两套实现判据一致
+  ```
 ## 许证
 
 CC-BY-NC-SA-4.0（见 `LICENSE` 与 `SKILL.md` frontmatter）。注意：非商业授权，商用再分发前请先确认合规。

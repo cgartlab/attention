@@ -32,13 +32,13 @@ bash scripts/smoke_test.sh --repo .
 
 | 校验 | 命令 | 结果 |
 |---|---|---|
-| 三层校验（pwsh 侧 runner） | `pwsh -NoProfile -File evals/run_evals.ps1` | **493 passed / 0 failed / 493** |
-| 三层校验（bash 侧 runner，独立实现） | `bash evals/run_evals.sh` | **493 passed / 0 failed / 493** |
+| 三层校验（pwsh 侧 runner） | `pwsh -NoProfile -File evals/run_evals.ps1` | **553 passed / 0 failed / 553** |
+| 三层校验（bash 侧 runner，独立实现） | `bash evals/run_evals.sh` | **553 passed / 0 failed / 553** |
 | 快速冒烟（双实现 + 负例） | `pwsh …/smoke_test.ps1 --repo .` | 5 passed / 0 failed |
 | 快速冒烟（bash） | `bash …/smoke_test.sh --repo .` | 5 passed / 0 failed |
 | `--repo` 无效 | `… --repo <不存在>` | 两实现均 `[FAIL] --repo path not found`、退出 1（**不再静默分析当前目录**） |
 
-**三层校验**：① 严格 JSON——`System.Text.Json` / python `json.load` 解析，拒绝字符串内裸控制字符；② parity——同 fixture、同参数下 `.sh` 与 `.ps1` 的**字段集与逐字段值**必须一致（路径形态、数组顺序、`null` vs `[]` 全算差异）；③ 断言表——`evals/script-assertions.json`（65 条）。
+**三层校验**：① 严格 JSON——`System.Text.Json` / python `json.load` 解析，拒绝字符串内裸控制字符；② parity——同 fixture、同参数下 `.sh` 与 `.ps1` 的**字段集与逐字段值**必须一致（路径形态、数组顺序、`null` vs `[]` 全算差异）；③ 断言表——`evals/script-assertions.json`（81 条）。
 
 **改前基线（同一套断言、原始脚本）**：用 `git worktree add --detach <path> HEAD` 取未修改的脚本，把 `evals/` 复制进去，跑**同一个 runner 与同一份断言表**：
 
@@ -51,11 +51,14 @@ bash scripts/smoke_test.sh --repo .
 
 ### 第二轮（P0/P1 落地：基准分离、Cargo 继承、vendor 排除、gh rules、lease）
 
+#### 第三轮（"立正巡自己"的 4 项缺陷修复 + `gh_authed` 探测改本地）
+
 | 阶段 | 结果 | 说明 |
 |---|---|---|
 | 只加 fixture + 断言（先红） | 455 passed / **36 failed** / 491 | 36 = 18 条新断言 × 2 实现；F1–F14 既有断言无一变红（未削弱任何一条） |
 | 批次 A（`branch_cleanup_audit`） | 479 / **12** / 491 | 本地/远程合并基准分离 + 基准守卫 + `cleanup.protect` + `gh rules` |
 | 终态（+ 版本改造、`tip_sha`、端点纠偏） | **493 / 0 / 493** | pwsh 与 bash 两套 runner 结果一致 |
+| 第三轮（4 项巡检缺陷修复 + gh_authed 探测改本地） | **553 / 0 / 553** | pwsh 与 bash 两套 runner 结果一致 |
 
 本轮修正的是一处**由 P6 引入的回归**：P6 把"本地合并判定"也改用了 `origin/<默认分支>`，导致"本地已合并、尚未推送"的分支被**漏报成空集**（假阴性）。现在本地用本地默认分支、远程用 `origin/<默认分支>` 并加基准守卫（`remote_base_unverified` + 警告）。F18/F19 覆盖这两个方向。
 
@@ -80,6 +83,9 @@ bash scripts/smoke_test.sh --repo .
 | F12 发布信号 | `chore(release)` / `feat!` / `fix:` / `BREAKING CHANGE:` footer |
 | F13 monorepo / F14 颜色注入 | `monorepo_mode`/`packages`、`color.ui=always` 下候选不漏 |
 | NEG-PATH / NEG-FILE / NEG-NOVALUE | `--repo` 无效与漏值 |
+| F15 vendor 未被忽略 / F16 Cargo workspace 继承 / F17 cleanup.protect 多值 | 版本扫描的排除表、继承与 packages、保护名单多值 |
+| F18 本地/远程合并基准分离 / F19 远程基准不可用 | 合并基准与守位（`remote_base_unverified`）|
+| F20 纯本地仓库（无 remote）/ F21 Skill 仓库 | `no-remote` 语义、`SKILL.md` 版本承载、自带测试入口、`XXX` 不误匹配 |
 
 ## 4. 行为层 eval（需 agent 执行）
 
@@ -87,7 +93,7 @@ bash scripts/smoke_test.sh --repo .
 
 **P6 修复后的定点复测（eval-3 场景：干净树 + 版本不一致 + 用户明示发版/提 PR）**：用更新后的 skill 重跑同一场景（独立 fixture），结论——
 
-- Phase 2 判为**干净态**；**Phase 2.5 意图分流**按 `SKILL.md` 的表格与示例把请求导向 Phase 3B 的门槛与交付步骤（修复前，这一请求在字面流程里无家可归）。
+- Phase 2 判为**干净态**；**意图分流**（当时称 Phase 2.5，后续已并入 Phase 2 的统一分流表、不再单列）按 `SKILL.md` 的表格与示例把请求导向 Phase 3B 的门槛与交付步骤（修复前，这一请求在字面流程里无家可归）。
 - **工作分支步骤生效**：在受保护名单内的 `main` 上先 `git switch -c chore/align-version-1.1.0` 再提交（修复前，脏态路径根本没有这一步，agent 只能自行发明）。
 - **版本门槛拦住了，但拦它的是 `consistent=false` 而非信号层**：该场景下 `release_signals=[]`、`release_involved=false`（版本改动已在提交里、工作树干净 → 变更集为空 → 信号层按构造为空）。子代理如实指出"若只看 `release_signals`/`release_involved` 会误判为不涉及 release"——这正是此前门槛失效的形态；现在由 `judgment-criteria.md` 的门槛层（"版本承载文件之间已不一致 → 需要 bump"）加上用户明示意图兜住。
 - 该轮为 delegated 执行：环境约定"确认视为已批准"，与 skill 的非交互硬规则（写出计划并停下、不得自批）冲突，子代理按环境指令执行并**显式记录了这次偏离**——说明该硬规则已被读到，但它在"上层指令要求继续"与"skill 要求停下"之间仍需要人裁决。

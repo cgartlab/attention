@@ -18,14 +18,20 @@
 - **改脚本要成对**：同时改 `.sh` 与 `.ps1`。
 - **改契约要三处同步**（**这是历史上漂移的根因**）：`references/scan-recipes.md`（单一事实源）+ `.sh` + `.ps1` + `evals/script-assertions.json` 的断言。只改一处即为漂移。
 - **不要在 SKILL.md 里复述 references 的规则**：SKILL.md 只做路由 + 三条铁律。历次硬伤（force push 范围被窄化、受保护名单漏项、核心文档集三处不一致）全部发生在"速查副本"里。
+- **加规则要配对减规则**（**这是文档膨胀的唯一刹车**）：往 `SKILL.md` / `AGENTS.md` / `references/` 加规则时，必须同时指出"哪条规则可以删或合并"。
+  - **硬规则**：`SKILL.md` 元规则（核心理念 + 铁律）的**净增长必须 ≤ 0**——加一条就删或合并一条。做不到，就在提交信息里写明"为什么这条非加不可、为什么没有可合并对象"。
+  - 理由：规则只增不减是单向的——删一条要论证"这个坑不会再踩"，这个论证几乎做不出来，于是每次修 bug 都留一条永久规则，最终元规则淹没工作流，读者找不到现役答案。
+  - **现状读数（2026-10-01，已执行一次合并）**：核心理念 3 条 + 铁律 3 条 = 6 条，对 6 个 Phase——**已达预算**。本轮把原先散落各节的 25 条条文下沉到 references/templates（内容均有权威定义，逐条核对无丢失），`SKILL.md` 从 188 行压到 ~155 行。
+  - 先减后加的操作方法与知识分层见 `references/core-docs-sync.md`。
 - **自检**（提交前跑，两者都要绿）：
   - 全量回归：`pwsh -NoProfile -File evals/run_evals.ps1`（三层校验：严格 JSON + 双实现 parity + 断言表；bash 侧 `bash evals/run_evals.sh`）
   - 快速冒烟：`pwsh -NoProfile -File scripts/smoke_test.ps1 --repo .`（`bash scripts/smoke_test.sh`）
+  - 发布前闸门（只读）：`pwsh -NoProfile -File scripts/release_preflight.ps1 --repo .`（`bash scripts/release_preflight.sh`）——工作区/分支/版本一致性/CHANGELOG/三层校验/冒烟，失败即退出 1；流程见 `docs/RELEASING.md`。
   - 测试工具说明见 `docs/VALIDATION.md`；审计背景与回归清单见 `docs/QUALITY-AUDIT.md`。
 
 ## evals/ 目录
-- `evals/fixtures.ps1` / `fixtures.sh`：生成 19 个 fixture（F1–F19，**默认落在系统临时目录**——在仓库内会让"非 git 目录"负例失效）。成对实现，改一个必须改另一个。
-- `evals/script-assertions.json`：断言表（唯一的期望值来源，当前 65 条）。**改断言等于改评测基准，必须同时说明理由**；不得为了变绿而放宽。
+- `evals/fixtures.ps1` / `fixtures.sh`：生成 21 个 fixture（F1–F21，**默认落在系统临时目录**——在仓库内会让"非 git 目录"负例失效）。成对实现，改一个必须改另一个。
+- `evals/script-assertions.json`：断言表（唯一的期望值来源，当前 81 条）。**改断言等于改评测基准，必须同时说明理由**；不得为了变绿而放宽。
 - `evals/run_evals.ps1` / `run_evals.sh`：runner，结果写 `evals/results/`（入库，作为验证证据）。
 - **并发注意**：同时跑多个 runner 时用 `-FixturesDir`／`--out-dir` 指定不同目录，否则会互相删除重建 fixture 产生假失败。
 
