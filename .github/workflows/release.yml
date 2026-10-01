@@ -29,7 +29,7 @@ jobs:
         with:
           fetch-depth: 0          # 版本判定/生成说明需要完整历史
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
