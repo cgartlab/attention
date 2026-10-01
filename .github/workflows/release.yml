@@ -107,6 +107,6 @@ jobs:
       # provenance 证明：public 仓库可直接用；private 仓库上若组织策略不允许会失败，故允许跳过
       - name: 产物来源证明（attestation，失败不阻塞发布）
         continue-on-error: true
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: dist/attention-*.zip
