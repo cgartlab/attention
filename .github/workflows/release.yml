@@ -39,8 +39,8 @@ jobs:
       - name: 冒烟（双实现语义断言）
         run: bash scripts/smoke_test.sh --repo .
 
-      - name: 发布前自检（只读闸门；tag 上为 detached HEAD，分支检查自然通过）
-        run: bash scripts/release_preflight.sh --repo .
+      - name: 发布前自检（--releasing 模式；tag 上为 detached HEAD，分支检查自然通过）
+        run: bash scripts/release_preflight.sh --repo . --releasing "${GITHUB_REF_NAME#v}"
 
   publish:
     name: 构建产物并发布

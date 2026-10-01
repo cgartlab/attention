@@ -24,7 +24,7 @@
 #>
 # 手工解析 $args：**不用 param()** —— PowerShell 的参数绑定不接受本仓库统一的 `--kebab-case` 形式
 # （`param([switch]$SkipTests)` 无法用 `--skip-tests` 传入），这是本仓库采集脚本的一致约定。
-$Repo = $null; $SkipTests = $false; $AllowDefaultBranch = $false; $Help = $false
+$Repo = $null; $SkipTests = $false; $AllowDefaultBranch = $false; $Help = $false; $Releasing = $null
 $argv = @($args)
 for ($i = 0; $i -lt $argv.Count; $i++) {
   $a = [string]$argv[$i]
@@ -33,12 +33,15 @@ for ($i = 0; $i -lt $argv.Count; $i++) {
   }
   elseif ($a -eq '--skip-tests') { $SkipTests = $true }
   elseif ($a -eq '--allow-default-branch') { $AllowDefaultBranch = $true }
+  elseif ($a -eq '--releasing') {
+    if ($i + 1 -lt $argv.Count) { $Releasing = [string]$argv[$i + 1]; $i++ } else { Write-Host '[FAIL] --releasing 缺少取值'; exit 1 }
+  }
   elseif ($a -eq '--help' -or $a -eq '-h') { $Help = $true }
 }
 
 $ErrorActionPreference = 'Continue'
 if ($Help) {
-  Write-Host "Usage: pwsh -NoProfile -File release_preflight.ps1 [--repo <path>] [--skip-tests] [--allow-default-branch] [--help]"
+  Write-Host "Usage: pwsh -NoProfile -File release_preflight.ps1 [--repo <path>] [--skip-tests] [--allow-default-branch] [--releasing <version>] [--help]"
   Write-Host "只读的发布前自检：工作区/分支/版本一致性/CHANGELOG/三层校验/冒烟。失败即退出 1。"
   exit 0
 }
@@ -89,18 +92,33 @@ if ($v) {
 } else { Add-Check '版本一致性' $false 'version_consistency_audit 未产出合法 JSON' }
 
 # 4) CHANGELOG 就绪
+#    开发期：要求 [Unreleased] 存在且至少 1 条（防止"没写变更就发版"）
+#    发布期（--releasing <ver>）：要求存在 `## [<ver>]` 段且其下有条目——切版后 [Unreleased] 会被清空，
+#    若仍按开发期判据检查，发布流水线会把自己挡住（这正是本模式存在的原因）
 $clPath = Join-Path $root 'CHANGELOG.md'
 if (Test-Path $clPath) {
   $cl = Get-Content $clPath -Raw
-  $hasUn = $cl -match '##\s*\[Unreleased\]'
-  $unBody = ''
-  if ($hasUn) {
-    $tail = ($cl -split '##\s*\[Unreleased\]')[1]
-    $unBody = ($tail -split "`n## ")[0]
+  if ($Releasing) {
+    $esc = [regex]::Escape($Releasing)
+    $hasVer = $cl -match ("##\s*\[" + $esc + "\]")
+    $verBody = ''
+    if ($hasVer) {
+      $tail = ($cl -split ("##\s*\[" + $esc + "\]"))[1]
+      $verBody = ($tail -split "`n## ")[0]
+    }
+    $vCount = @($verBody -split "`n" | Where-Object { $_ -match '^-\s' }).Count
+    Add-Check "CHANGELOG 含 [$Releasing] 且有条目" ($hasVer -and $vCount -gt 0) $(if (-not $hasVer) { "找不到 `## [$Releasing]` 段" } elseif ($vCount -eq 0) { "[$Releasing] 段没有条目" } else { "发布段 [$Releasing] 有 $vCount 条" })
+  } else {
+    $hasUn = $cl -match '##\s*\[Unreleased\]'
+    $unBody = ''
+    if ($hasUn) {
+      $tail = ($cl -split '##\s*\[Unreleased\]')[1]
+      $unBody = ($tail -split "`n## ")[0]
+    }
+    $count = @($unBody -split "`n" | Where-Object { $_ -match '^-\s' }).Count
+    Add-Check 'CHANGELOG [Unreleased] 就绪' ($hasUn -and $count -gt 0) $(if (-not $hasUn) { '找不到 [Unreleased] 段' } elseif ($count -eq 0) { '[Unreleased] 存在但没有条目（切版后请改用 --releasing <ver>）' } else { "$count 条待发布条目" })
   }
-  $count = @($unBody -split "`n" | Where-Object { $_ -match '^-\s' }).Count
-  Add-Check 'CHANGELOG [Unreleased] 就绪' ($hasUn -and $count -gt 0) $(if (-not $hasUn) { '找不到 [Unreleased] 段' } elseif ($count -eq 0) { '[Unreleased] 存在但没有条目' } else { "$count 条待发布条目" })
-} else { Add-Check 'CHANGELOG [Unreleased] 就绪' $false 'CHANGELOG.md 不存在' }
+} else { Add-Check 'CHANGELOG 就绪' $false 'CHANGELOG.md 不存在' }
 
 # 5) 三层校验
 if ($SkipTests) {

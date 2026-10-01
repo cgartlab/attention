@@ -4,14 +4,15 @@
 # 用法: bash scripts/release_preflight.sh [--repo <path>] [--skip-tests] [--allow-default-branch]
 set -u
 
-REPO=""; SKIP_TESTS=0; ALLOW_DEFAULT=0
+REPO=""; SKIP_TESTS=0; ALLOW_DEFAULT=0; RELEASING=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --repo) if [ $# -ge 2 ]; then REPO="$2"; shift 2; else echo "[FAIL] --repo 缺少取值"; exit 1; fi ;;
     --skip-tests) SKIP_TESTS=1; shift ;;
     --allow-default-branch) ALLOW_DEFAULT=1; shift ;;
+    --releasing) if [ $# -ge 2 ]; then RELEASING="$2"; shift 2; else echo "[FAIL] --releasing 缺少取值"; exit 1; fi ;;
     --help|-h)
-      echo "Usage: bash release_preflight.sh [--repo <path>] [--skip-tests] [--allow-default-branch]"
+      echo "Usage: bash release_preflight.sh [--repo <path>] [--skip-tests] [--allow-default-branch] [--releasing <version>]"
       echo "只读的发布前自检：工作区/分支/版本一致性/CHANGELOG/三层校验/冒烟。失败即退出 1。"
       exit 0 ;;
     *) shift ;;
@@ -80,16 +81,23 @@ else
   check "版本一致性" 1 "无可用 JSON 解析器（设 ATTENTION_EVAL_PYTHON）或无输出 → 无从判定"
 fi
 
-# 4) CHANGELOG [Unreleased]
+# 4) CHANGELOG 就绪（开发期看 [Unreleased]；--releasing <ver> 看发布段）
 if [ -f CHANGELOG.md ]; then
-  if grep -q '^## \[Unreleased\]' CHANGELOG.md; then
+  if [ -n "$RELEASING" ]; then
+    if grep -q "^## \[$RELEASING\]" CHANGELOG.md; then
+      cnt=$(awk -v v="$RELEASING" '$0 ~ "^## \\[" v "\\]" {f=1;next} /^## \[/{f=0} f && /^- /{c++} END{print c+0}' CHANGELOG.md)
+      if [ "$cnt" -gt 0 ]; then check "CHANGELOG 含 [$RELEASING] 且有条目" 0 "发布段 [$RELEASING] 有 $cnt 条"; else check "CHANGELOG 含 [$RELEASING] 且有条目" 1 "[$RELEASING] 段没有条目"; fi
+    else
+      check "CHANGELOG 含 [$RELEASING] 且有条目" 1 "找不到 ## [$RELEASING] 段"
+    fi
+  elif grep -q '^## \[Unreleased\]' CHANGELOG.md; then
     cnt=$(awk '/^## \[Unreleased\]/{f=1;next} /^## \[/{f=0} f && /^- /{c++} END{print c+0}' CHANGELOG.md)
-    if [ "$cnt" -gt 0 ]; then check "CHANGELOG [Unreleased] 就绪" 0 "$cnt 条待发布条目"; else check "CHANGELOG [Unreleased] 就绪" 1 '[Unreleased] 存在但没有条目'; fi
+    if [ "$cnt" -gt 0 ]; then check "CHANGELOG [Unreleased] 就绪" 0 "$cnt 条待发布条目"; else check "CHANGELOG [Unreleased] 就绪" 1 '[Unreleased] 存在但没有条目（切版后请改用 --releasing <ver>）'; fi
   else
     check "CHANGELOG [Unreleased] 就绪" 1 '找不到 [Unreleased] 段'
   fi
 else
-  check "CHANGELOG [Unreleased] 就绪" 1 'CHANGELOG.md 不存在'
+  check "CHANGELOG 就绪" 1 'CHANGELOG.md 不存在'
 fi
 
 # 5) 三层校验 + 6) 冒烟
