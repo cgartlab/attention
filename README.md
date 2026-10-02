@@ -1,10 +1,25 @@
-# 立正Skill（attention）
+<p align="center">
+  <img src="assets/logo.svg" width="128" height="128" alt="attention logo">
+</p>
 
-[![skills.sh](https://skills.sh/b/cgartlab/attention)](https://skills.sh/cgartlab/attention)
-[![Agent Skills](https://img.shields.io/badge/Agent_Skills-compatible-4b3baf)](https://agentskills.io)
-[![License: CC-BY-NC-SA-4.0](https://img.shields.io/badge/License-CC--BY--NC--SA--4.0-lightgrey)](LICENSE)
+<h1 align="center">立正Skill（attention）</h1>
 
-任意 Git 项目的"站好队"巡检与修复 Agent Skill。一次调用，让项目回到可发布状态。
+<p align="center">
+  <b>任意 Git 项目的"站好队"巡检与修复 Agent Skill。</b>一次调用，让项目回到可发布状态。
+</p>
+
+<p align="center">
+  <a href="https://agentskills.io"><img alt="Agent Skills compatible" src="https://img.shields.io/badge/Agent_Skills-compatible-4b3baf"></a>
+  <a href="https://github.com/cgartlab/attention/releases/tag/v0.1.0"><img alt="release v0.1.0" src="https://img.shields.io/badge/release-v0.1.0-success"></a>
+  <img alt="skill version 0.1.0" src="https://img.shields.io/badge/skill_version-0.1.0-2563eb">
+  <a href="https://github.com/cgartlab/attention/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/cgartlab/attention/actions/workflows/ci.yml/badge.svg"></a>
+  <img alt="checks: 553 passed" src="https://img.shields.io/badge/checks-553_passed-3fb950">
+  <img alt="shell: bash + pwsh" src="https://img.shields.io/badge/shell-bash_%2B_pwsh-4EAA25">
+  <img alt="runtime deps: git only" src="https://img.shields.io/badge/runtime-git_only-lightgrey">
+  <a href="LICENSE"><img alt="license: CC-BY-NC-SA-4.0" src="https://img.shields.io/badge/License-CC--BY--NC--SA--4.0-lightgrey"></a>
+</p>
+
+> **徽章说明**：本仓库是 **private**，shields.io 读不到私有仓库的动态数据，故 `release` / `skill_version` / `checks` 为**静态徽章**（随发版手改，`checks` 数值取自最近一次发布门禁的全量结果）；`CI` 徽章为 GitHub 原生，**需有仓库读权限**才会显示。skills.sh 徽章只对公开仓库有效，故未使用。
 
 ## 它做什么
 

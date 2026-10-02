@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-labelledby="t">
+  <title id="t">attention — app icon</title>
+  <defs>
+    <linearGradient id="ag1" x1="0.58" y1="0.016" x2="1.0" y2="1.0">
+      <stop offset="0" stop-color="#8AB4FF"/>
+      <stop offset="1" stop-color="#1B3358"/>
+    </linearGradient>
+    <linearGradient id="ag2" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0" stop-color="#1B3358"/>
+      <stop offset="1" stop-color="#8AB4FF"/>
+    </linearGradient>
+    <clipPath id="ios-mask">
+      <rect width="1024" height="1024" rx="228" ry="228"/>
+    </clipPath>
+  </defs>
+  <rect width="1024" height="1024" rx="228" ry="228" fill="#0E1626"/>
+  <g clip-path="url(#ios-mask)">
+    <path d="M97,895C97,895,325.96636962890625,606.642822265625,594,606C881.9663696289062,605.3094482421875,930,896,930,896C930,896,788.3253784179688,113.712646484375,510.9761657714844,113.712646484375C234.99205017089844,113.712646484375,97,895,97,895" fill="url(#ag1)"/>
+    <path d="M97,895C97.88961791992188,895,788.3253784179688,113.712646484375,510.9761657714844,113.712646484375C234.99205017089844,113.712646484375,97,895,97,895" fill="url(#ag2)"/>
+  </g>
+</svg>

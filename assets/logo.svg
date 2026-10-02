@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="128" height="128" role="img" aria-labelledby="t">
+  <title id="t">attention</title>
+  <style>
+    .bg { fill: #E6E4E1; }
+    .s1a { stop-color: #FFFFFF; }
+    .s1b { stop-color: #424242; }
+    .s2a { stop-color: #323232; }
+    .s2b { stop-color: #FFFFFF; }
+    @media (prefers-color-scheme: dark) {
+      .bg  { fill: #0F1A2B; }
+      .s1a { stop-color: #7CA9FF; }
+      .s1b { stop-color: #162644; }
+      .s2a { stop-color: #162644; }
+      .s2b { stop-color: #7CA9FF; }
+    }
+  </style>
+  <defs>
+    <linearGradient id="g1" x1="0.58" y1="0.016" x2="1.0" y2="1.0">
+      <stop class="s1a" offset="0"/>
+      <stop class="s1b" offset="1"/>
+    </linearGradient>
+    <linearGradient id="g2" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop class="s2a" offset="0"/>
+      <stop class="s2b" offset="1"/>
+    </linearGradient>
+  </defs>
+  <rect class="bg" width="1024" height="1024"/>
+  <path d="M97,895C97,895,325.96636962890625,606.642822265625,594,606C881.9663696289062,605.3094482421875,930,896,930,896C930,896,788.3253784179688,113.712646484375,510.9761657714844,113.712646484375C234.99205017089844,113.712646484375,97,895,97,895" fill="url(#g1)"/>
+  <path d="M97,895C97.88961791992188,895,788.3253784179688,113.712646484375,510.9761657714844,113.712646484375C234.99205017089844,113.712646484375,97,895,97,895" fill="url(#g2)"/>
+</svg>

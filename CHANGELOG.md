@@ -6,6 +6,8 @@
 
 ## [Unreleased]
 
+### Added
+- **logo 与 app icon**：`assets/logo.svg` 重建为干净版（保留作者手绘的两条曲线 path + 双向渐变填充，去编辑器冗余，加 `prefers-color-scheme: dark` 深色适配与 `<title>` 无障碍标签）；新增 `assets/app-icon.svg`（1024×1024、iOS 圆角矩形 `rx=228`、暗色底 + 蓝色渐变 A）；README 顶部居中展示 logo + 更新徽章组（移除私有仓库上失效的 skills.sh 徽章，加 release/CI/shell/runtime/checks 静态徽章与说明）。
 ## [0.1.0] - 2026-10-01
 
 首次公开发布（此前未对外发布过任何版本，故本次发布涵盖自 2026-09-29 内部初版以来的全部工作）。
