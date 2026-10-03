@@ -6,6 +6,7 @@
 
 ## [Unreleased]
 
+- **交付策略（新规则）**：立正在其他项目上跑时，诊断阶段纳入排查过程中发现的小毛病（非用户主诉但真实存在）；最终交付物只有 PR（不创建 Issue）；收尾报告包含 PR 合并顺序建议（按依赖与风险排序）。
 ### Added
 - **logo 与 app icon**：`assets/logo.svg` 重建为干净版（保留作者手绘的两条曲线 path + 双向渐变填充，去编辑器冗余，加 `prefers-color-scheme: dark` 深色适配与 `<title>` 无障碍标签）；新增 `assets/app-icon.svg`（1024×1024、iOS 圆角矩形 `rx=228`、暗色底 + 蓝色渐变 A）；README 顶部居中展示 logo + 更新徽章组（移除私有仓库上失效的 skills.sh 徽章，加 release/CI/shell/runtime/checks 静态徽章与说明）。
 ## [0.1.0] - 2026-10-01
