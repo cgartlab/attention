@@ -105,18 +105,20 @@ Phase 4 收尾报告（含可发布判定）
 
 > 本路径同时服务"脏态修复"与"干净态但有交付意图"（Phase 2 分流结果）。工作区本来就干净时第 1、4 步可能空转——照走，不要跳过门槛。
 
-1. **诊断**：用 `git_state_snapshot` 归类未提交/未推送改动（WIP 功能 / 构建破损 / 半成品）。先诊断全找全，出问题清单，禁止边找边改。
+1. **诊断**：用 `git_state_snapshot` 归类未提交/未推送改动（WIP 功能 / 构建破损 / 半成品）。先诊断全找全，出问题清单，禁止边找边改。**排查过程中发现的小毛病（非用户主诉但真实存在的小问题，如假阳性噪音、过期数字、未实现的小功能）也纳入清单**——与主诉问题一起在计划表中分组，不因其"小"而跳过。
 2. **修复计划 + 计划表**：基于 diff 给出具体可发布化计划，并**列成表**（模板见 `assets/templates/plan-table.md`）：将创建 / 将更新 / 将跳过（附原因） / 需你确认。用 `ask_user_question` 呈现，一次批准覆盖后续本地动作（编辑、测试、提交、**本地**分支删除）。**推送不在此列**——push/PR/删远程分支/推 tag 属远程不可逆动作，执行点另做最终确认。
 3. **工作分支（必做，不可省）**：若当前分支在受保护名单内（例如正站在 `main` 上），先 `git switch -c <type>/<slug>`——命名沿用仓库既有习惯（从 `git log` / `git branch` 实测得出）。**禁止直接在默认分支上提交并推送**。无法建分支 → 停止并报告。
 4. **执行修复 + 逐步 verify**：应用编辑，每个改动点后立刻验证（跑测试 / 回读文件 / 重跑相关脚本）再进下一步。跑测试/lint/build 至绿；绿不了就如实报告阻塞器，不硬提交。
 5. **文档同步门槛（提交前）**：跑 `core_docs_relevance_scan`，按 `references/core-docs-sync.md` 更新核心文档；CHANGELOG 分节与可见性见 `references/changelog-sections.md`。**该扫描是低精度提示**：`docs_mentioning_changes=[]` 不代表文档已同步（文档只写函数名不写文件名时它必然为空），`docs_stale_candidates` 才是"请人工确认"的清单。**含未消解 ［待补充］ 的文档要么不进提交，要么在 PR body 显式列为阻塞项。**
 6. **发行版本门槛（提交前）**：按 `references/judgment-criteria.md` 的**多层门**判定——脚本给 `release_signals`（宽口径），**是否真的 bump 由你结合用户意图判定并说明理由**；需要 bump 时一致 bump 所有版本文件、补 CHANGELOG、记录 tag 计划。`consistent=null`（无版本文件）时不要声称"版本已一致"。
-7. **提交**：按探测到的提交规约，一个提交一个意图；body 讲 **WHY**（diff 已说明 WHAT）。模板见 `assets/templates/commit-message.md`。
-8. **推送与开 PR**：推送前做**远程动作最终确认**。GitHub → `gh pr create`（模板见 `assets/templates/pr-body.md`）；非 GitHub / CLI 不可用 / 远程不可达 → 输出 PR/MR 就绪产物（分支、diff 概览、建议标题正文、手动指引），**不编造**宿主专属命令。开 PR 前先查是否已有同题开放 issue/PR（`gh_query_state="ok"` 时才作数）。
+7. **提交**：按探测到的提交规约，一个提交一个意图；body 讲 **WHY**（diff 已说明 WHAT）。**改动按逻辑分组，每组走独立分支 + PR（不创建 Issue）**——一个大改动可拆成多个 PR（如 fix + docs + feat 各一），便于逐个评审与回滚。模板见 `assets/templates/commit-message.md`。
+8. **推送与开 PR**：推送前做**远程动作最终确认**。GitHub → `gh pr create`（模板见 `assets/templates/pr-body.md`）；非 GitHub / CLI 不可用 / 远程不可达 → 输出 PR/MR 就绪产物（分支、diff 概览、建议标题正文、手动指引），**不编造**宿主专属命令。**不创建 Issue——最终交付物只有 PR**。开 PR 前先查是否已有同题开放 PR（`gh_query_state="ok"` 时才作数）。
 
 ## Phase 4 — 收尾报告
 
 结构、可发布判定（READY / NOT READY / BLOCKED）、CRITICAL/WARNING/SUGGESTION 分级、大白话语言规则与脱敏要求，**全部见 `assets/templates/status-report.md`**（含 ❌/✓ 正反例）。一条底线：报告要能让人**立刻知道下一步干什么**，字段名与命令串只进末尾"📋 技术细节（可选）"小节。
+
+**收尾报告须包含 PR 合并顺序建议**（若有多个 PR）：按依赖关系与风险排序（纯文档 PR → fix PR → feat PR），给出每条 PR 的合并前提与冲突风险提示。让用户一眼看清"先合哪个、哪个可能需要 rebase"。
 
 ## 安全与边界
 
