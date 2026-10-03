@@ -6,9 +6,20 @@
 
 ## [Unreleased]
 
-- **交付策略（新规则）**：立正在其他项目上跑时，诊断阶段纳入排查过程中发现的小毛病（非用户主诉但真实存在）；最终交付物只有 PR（不创建 Issue）；收尾报告包含 PR 合并顺序建议（按依赖与风险排序）。
+## [0.1.1] - 2026-10-03
+
 ### Added
 - **logo 与 app icon**：`assets/logo.svg` 重建为干净版（保留作者手绘的两条曲线 path + 双向渐变填充，去编辑器冗余，加 `prefers-color-scheme: dark` 深色适配与 `<title>` 无障碍标签）；新增 `assets/app-icon.svg`（1024×1024、iOS 圆角矩形 `rx=228`、暗色底 + 蓝色渐变 A）；README 顶部居中展示 logo + 更新徽章组（移除私有仓库上失效的 skills.sh 徽章，加 release/CI/shell/runtime/checks 静态徽章与说明）。
+- `branch_cleanup_audit` 新增 `worktree_branches(str[])` 报告字段（PR #6）：取 `git worktree list --porcelain` 的 `branch refs/heads/<name>` 行。**只报告、不作为删除判据**——`git branch -d` 与 `-D` 本身都拒绝删除被 worktree 检出的分支（实测确认），故这是报告层改进而非安全修复。
+
+### Changed
+- **交付策略（新规则）**：立正在其他项目上跑时，诊断阶段纳入排查过程中发现的小毛病（非用户主诉但真实存在）；最终交付物只有 PR（不创建 Issue）；收尾报告包含 PR 合并顺序建议（按依赖与风险排序）。
+- `docs/ecosystem-survey.md` 正文两处内联勘误（PR #5，原句保留以维持可追溯）：§4.2 patch-id 口径"同时抓 squash + rebase"**只对 squash 成立**（多 commit rebase 需两侧逐 commit；cherry-pick 必然误报才是"只报告不删"的真正理由）；§4.5 rulesets 用法（列表端点不返回 `rules`/`conditions`，正确端点是 `rules/branches/{branch}`；分支不存在返回 `[]`+200 陷阱）。
+
+### Fixed
+- 采集信号去噪（PR #4）：`todo_fixme` 排除 `evals/` 测试数据（本仓库自身 6 条假阳性 → 0，fixture 里的 "TODO" 字样本就是测试数据）；`core_docs` 排除 `docs/research/` 与 `docs/ecosystem-research/` 调研目录（否则调研备忘被当核心文档，`docs_stale_candidates` 与 `docs_mentioning_changes` 充满噪音）。
+- worktree 扫描的 PowerShell 实现改用 `GitOut`（PR #6 的 CI 双 job 全红根因）：`Git1` 只返回命令输出的**首行**，而 `git worktree list --porcelain` 首行是 `worktree <path>`、`branch refs/heads/<name>` 在后续行，导致 `.ps1` 恒返回空数组、与 `.sh` 的真实值持续 parity 失败。典型的"两套实现看着对称、助手语义却不同"。
+
 ## [0.1.0] - 2026-10-01
 
 首次公开发布（此前未对外发布过任何版本，故本次发布涵盖自 2026-09-29 内部初版以来的全部工作）。

@@ -4,8 +4,8 @@ description: 立正——任意 Git 项目的"站好队"巡检与修复 skill。
 license: CC-BY-NC-SA-4.0
 compatibility: Requires git (mandatory). gh optional (PR/issue queries; degrades to PR-ready artifacts). Bundled scripts need bash or PowerShell 7 — falls back to running git recipes manually. All analysis is local — no third-party services, no network calls beyond the repo's own remote.
 metadata:
-  version: "0.1.0"
-  date: "2026-10-01"
+  version: "0.1.1"
+  date: "2026-10-03"
   reference: "https://github.com/cgartlab/attention"
 ---
 
