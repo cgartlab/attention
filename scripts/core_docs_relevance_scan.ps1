@@ -139,7 +139,7 @@ foreach ($f in @(Get-ChildItem -File -ErrorAction SilentlyContinue)) {
 }
 if (Test-Path -LiteralPath 'docs') {
   $docsRoot = (Resolve-Path -LiteralPath 'docs').Path
-  $dl = @(Get-ChildItem -LiteralPath $docsRoot -Recurse -File -Filter *.md -ErrorAction SilentlyContinue | ForEach-Object {
+  $dl = @(Get-ChildItem -LiteralPath $docsRoot -Recurse -File -Filter *.md -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch "[\\/](research|ecosystem-research)[\\/]" } | ForEach-Object {
     $rel = $_.FullName.Substring($docsRoot.Length).TrimStart('\','/')
     'docs/' + (ToPosix $rel)
   })

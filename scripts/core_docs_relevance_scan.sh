@@ -38,7 +38,7 @@ for f in *; do
   esac
 done
 if [ -d docs ]; then
-  docs_list=$(find docs -type f -name '*.md' 2>/dev/null | sed 's|\\|/|g' | tr -d '\r' | awk 'NF' | sort -u | head -50)
+  docs_list=$(find docs -type f -name '*.md' -not -path 'docs/research/*' -not -path 'docs/ecosystem-research/*' 2>/dev/null | sed 's|\\|/|g' | tr -d '\r' | awk 'NF' | sort -u | head -50)
   core_raw+="$docs_list"$'\n'
 fi
 core_docs=$(printf '%s\n' "$core_raw" | awk 'NF' | sort -u)
