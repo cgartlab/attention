@@ -170,7 +170,7 @@ if ($isGithub -and $ghAuthed) {
 # `(^|[^X])XXX([^X]|$)` 只命中「左右都不是 X」的孤立 XXX。
 $tout = @(GitOut @('grep','--untracked','-n','-E','-e','TODO|FIXME|HACK|(^|[^X])XXX([^X]|$)','--','.',
   ':(exclude,top)*.md',':(exclude,top)*.markdown',':(exclude,top)*.json',':(exclude,top)*.rst',
-  ':(exclude,top)scripts/next_steps_analysis.ps1',':(exclude,top)scripts/next_steps_analysis.sh'))
+  ':(exclude,top)scripts/next_steps_analysis.ps1',':(exclude,top)scripts/next_steps_analysis.sh',':(exclude,top)evals/'))
 $grc = $LASTEXITCODE
 if ($grc -gt 1) { Add-Warn 'git-grep-failed' }
 $tmpT = NonBlank $tout

@@ -81,7 +81,7 @@ fi
 # `(^|[^X])XXX([^X]|$)` 只命中「左右都不是 X」的孤立 XXX。
 tout=$(git grep --untracked -n -E -e 'TODO|FIXME|HACK|(^|[^X])XXX([^X]|$)' -- . \
   ':(exclude,top)*.md' ':(exclude,top)*.markdown' ':(exclude,top)*.json' ':(exclude,top)*.rst' \
-  ':(exclude,top)scripts/next_steps_analysis.ps1' ':(exclude,top)scripts/next_steps_analysis.sh' 2>/dev/null)
+  ':(exclude,top)scripts/next_steps_analysis.ps1' ':(exclude,top)scripts/next_steps_analysis.sh' ':(exclude,top)evals/' 2>/dev/null)
 grc=$?
 [ $grc -gt 1 ] && warn_add "git-grep-failed"
 todos=$(printf '%s\n' "$tout" | head -30 | awk 'NF' | jarr_str)

@@ -127,7 +127,7 @@ staged(`git diff --cached --name-only --no-renames -z`) ∪ unstaged(`git diff -
 
 **用途**：核心文档与变更的交叉引用扫描（**低精度提示**，不是"文档是否需要更新"的裁决）。
 **git 命令**：变更集（通用）。
-- core_docs：顶层匹配 `^(README|CHANGELOG|CHANGES|HISTORY|CONTRIBUTING|LICENSE|AGENTS|CLAUDE)` 的**普通文件**（目录不算）；加 `docs/**/*.md`（前 50 个）
+- core_docs：顶层匹配 `^(README|CHANGELOG|CHANGES|HISTORY|CONTRIBUTING|LICENSE|AGENTS|CLAUDE)` 的**普通文件**（目录不算）；加 `docs/**/*.md`（前 50 个），**排除 `docs/research/` 与 `docs/ecosystem-research/`**（调研备忘不是项目核心文档，混入会让 `docs_stale_candidates` 与 `docs_mentioning_changes` 充满噪音）
 - changed_basenames = 变更文件 basename 去重排序
 - 每个核心文档：读内容；对每个 changed basename 做**字面匹配（不区分大小写，正则转义）** → `references[]`
 - `docs_mentioning_changes`（**原 `docs_needing_update` 更名**）：`[{doc, references[]}]`——**只表示"该文档提到了这些变更文件名"**。它为空**不代表**文档已同步：文档从不引用文件名（只写函数名/命令名）的仓库里它恒为空，而那恰恰是最该补文档的情况
@@ -152,7 +152,7 @@ staged(`git diff --cached --name-only --no-renames -z`) ∪ unstaged(`git diff -
   - 查询失败 → 字段置 **null** 且 `gh_query_state="unavailable"` + `gh-query-failed` 警告（**不得**输出 `[]`，那会被读成"没有开放 issue/PR"这一事实性否定）
   - 不适用（非 GitHub / 未登录）→ 字段 `null`，`gh_query_state="not-applicable"`
   - 成功 → `gh_query_state="ok"`
-- todo_fixme：`git grep --untracked -n -E -e 'TODO|FIXME|XXX|HACK' -- . ':(exclude)*.md' ':(exclude)*.markdown' ':(exclude)*.json' ':(exclude)*.rst' ':(exclude)scripts/next_steps_analysis.ps1' ':(exclude)scripts/next_steps_analysis.sh'`（前 30）。pattern 为 `TODO|FIXME|HACK|(^|[^X])XXX([^X]|$)`：**`XXX` 必须排除连续的 X 串**，否则会命中 `mktemp` 模板里的 `XXXXXX`/`XXXXXXXX` 占位符（实测本仓库 8 条命中里有 2 条是这种假阳性）。**`--untracked` 必须放在 pattern 之前**（写成 `git grep -E PAT --untracked` 会被 git 当成 revision，报 `unable to resolve revision`）；排除表写全、不省略；**不排除 `*.txt`**——文本文件里的 TODO 同样是有效信号
+- todo_fixme：`git grep --untracked -n -E -e 'TODO|FIXME|XXX|HACK' -- . ':(exclude)*.md' ':(exclude)*.markdown' ':(exclude)*.json' ':(exclude)*.rst' ':(exclude)scripts/next_steps_analysis.ps1' ':(exclude)scripts/next_steps_analysis.sh' ':(exclude)evals/'`（前 30）。pattern 为 `TODO|FIXME|HACK|(^|[^X])XXX([^X]|$)`：**`XXX` 必须排除连续的 X 串**，否则会命中 `mktemp` 模板里的 `XXXXXX`/`XXXXXXXX` 占位符（实测本仓库 8 条命中里有 2 条是这种假阳性）。**`--untracked` 必须放在 pattern 之前**（写成 `git grep -E PAT --untracked` 会被 git 当成 revision，报 `unable to resolve revision`）；排除表写全、不省略；**不排除 `*.txt`**——文本文件里的 TODO 同样是有效信号
 - `git for-each-ref --format='%(refname:short)%09%(committerdate:iso-strict)' refs/heads` → branches `[{branch,last_commit}]`
 - test_commands：`package.json` scripts 的 test/lint/build/check/typecheck/format → `{name,script}`（script 为**完整命令串**，含转义引号，不得截断）；Makefile 目标 test/lint/build/check → `make <t>`；pyproject.toml 含 pytest/ruff/mypy → 该名；**另外识别"本 skill 自带的测试入口"**：`evals/run_evals.ps1|sh` → `{name:"run_evals"}`、`scripts/smoke_test.ps1|sh` → `{name:"smoke_test"}`（脚本按探测到的 shell 给出对应实现）。**为什么**：采用本 skill 的仓库其真实性测试入口就是这两个（实测本仓库 `test_commands=[]`，"这项目有没有测试"看不见）
 - behind_default：`origin/<default>` 存在则 `git rev-list --count origin/<default>..HEAD`；否则 null
