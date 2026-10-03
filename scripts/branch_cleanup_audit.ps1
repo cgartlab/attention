@@ -319,6 +319,10 @@ function Is-RuleProtected([string]$n) {
 $localMerged = @($localMergedPre | Where-Object { -not (Is-RuleProtected $_) })
 $remoteMerged = @($remotePre | Where-Object { -not (Is-RuleProtected $_.branch) })
 
+# worktree 检出报告（只报告，不作为删除判据——git branch -d 本身就拒绝删除被 worktree 检出的分支）
+$wtRaw = GitOut @('worktree','list','--porcelain')
+$wtBranches = @($wtRaw -split "`n" | Where-Object { $_ -match '^branch refs/heads/' } | ForEach-Object { ($_ -replace '^branch refs/heads/','').Trim() } | Sort-Object -Unique)
+
 $result = [ordered]@{
   is_git                       = $true
   default_branch               = $default
@@ -333,6 +337,7 @@ $result = [ordered]@{
   local_merged_candidates      = @($localMerged)
   local_stale_unmerged_report  = @($localStale)
   remote_merged_candidates     = @($remoteMerged)
+  worktree_branches            = @($wtBranches)
   warnings                     = @($warns)
 }
 Write-Output (ConvertTo-Json -Depth 8 $result)

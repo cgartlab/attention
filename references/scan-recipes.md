@@ -81,7 +81,8 @@ staged(`git diff --cached --name-only --no-renames -z`) ∪ unstaged(`git diff -
 - `git for-each-ref --format='%(refname:short)' refs/remotes`（取 origin/*，跳过 origin/HEAD）
 - 每个远程分支：`git branch -r --merged origin/<default>` 含 `origin/<short>` 且非受保护 → remote_merged_candidates `{branch,tracking_ref,remote_exists(bool),tip_sha(str|null)}`；`remote_exists` 必须用**精确匹配**（`grep -Fxq` / 哈希表），不得用无锚定子串（`feat` 会误配 `feat-x`）。**`tip_sha`** = 审计时该分支的 tip（`git rev-parse refs/remotes/origin/<short>`）：删除远程分支时**必须**把它传给 `git push origin --force-with-lease=<branch>:<sha> --delete <branch>`，否则确认窗口内他人推送的提交会被静默删掉（实测可复现的数据丢失）
 
-**JSON**：`{is_git(bool), default_branch(str|null), default_branch_source(str), current_branch(str|null), remote_reachable(bool), protected_from_rulesets(str[]), local_merge_base(str|null), remote_merge_base(str|null), remote_base_unverified(bool), protected(str[]), local_merged_candidates(str[]), local_stale_unmerged_report([{branch,last_commit,age_days}]), remote_merged_candidates([{branch,tracking_ref,remote_exists,tip_sha}]), warnings(str[])}`
+**JSON**：`{is_git(bool), default_branch(str|null), default_branch_source(str), current_branch(str|null), remote_reachable(bool), protected_from_rulesets(str[]), local_merge_base(str|null), remote_merge_base(str|null), remote_base_unverified(bool), protected(str[]), local_merged_candidates(str[]), local_stale_unmerged_report([{branch,last_commit,age_days}]), remote_merged_candidates([{branch,tracking_ref,remote_exists,tip_sha}]), worktree_branches(str[]), warnings(str[])}`
+- **worktree_branches**：当前被 worktree 检出的本地分支名（git worktree list --porcelain 的 ranch refs/heads/<name> 行）。**只报告，不作为删除判据**——git branch -d 本身就拒绝删除被 worktree 检出的分支（实测 -d 与 -D 都拒绝）。detached HEAD 无 ranch 行 → 该数组不含该 worktree 的分支。
 
 > 远程剪枝的可判定条件见 `branch-model-and-protection.md`：候选来自 remote-tracking ref，**不能**要求"远端已无对应 ref"（`fetch --prune` 之后恒假）。
 
