@@ -258,6 +258,8 @@ is-ancestor origin/feature2 main exit=1
 
 **业界解法**：nkt/git-cleanup 的 patch-id 方案——内容哈希比对，同时抓 squash + rebase。立正落地方式见 §8 的「P2 值得做」。
 
+> ⚠️ **勘误（2026-10-01，见 `docs/research/p2-verification.md` §1）**：上面"同时抓 squash + rebase"**只对 squash 成立**。多 commit rebase 下，"topic 整段 patch-id vs main 逐 commit patch-id"实测交集为空（N 个提交合成 1 个 patch-id 不可能匹配 N 个独立的）；正确口径是**两侧都逐 commit**。另实测 cherry-pick 必然误报，这才是"只报告不删"的真正理由。
+
 ### 4.3 【实测】远程合并判定用本地 base — ⚠️ 数据丢失风险
 
 **这是本次调研发现的唯一涉及数据丢失的缺陷**，已独立复现。
@@ -330,6 +332,8 @@ fi
 - `GET /repos/{o}/{r}/rules/{ref}` — 列出实际作用于某 ref 的规则（跨仓库+组织+企业汇总）
 - `GET /repos/{o}/{r}/branches/{b}/protection` — legacy branch protection
 - 判断「能否删」：ruleset 的 `rules[]` 里出现 `type == "deletion"`
+
+> ⚠️ **勘误（2026-10-01，见 `docs/research/p2-verification.md` §2）**：`GET /rulesets`（列表）**不返回 `rules`/`conditions`**（实测只回 `id/name/target/enforcement/source/_links`），据此判删除保护**永远判不出来**。`GET /rules/{ref}` **404 不存在**。正确端点是 **`GET /repos/{o}/{r}/rules/branches/{branch}`**（返回该分支实际生效的 active 规则，已替你过滤 `enforcement` 和 ref 匹配）；**分支不存在时返回 `[]` + 200**（陷阱，须先确认分支存在）。
 
 **更彻底的方案**（可作为立正的「下一步建议」输出）：仓库 Settings → Pull requests → 开 "Automatically delete head branches"，让 GitHub 自己在合并时删源分支，工具只负责报告——**完全消除不可逆风险**。
 
