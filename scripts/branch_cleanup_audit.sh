@@ -237,8 +237,11 @@ while IFS= read -r line; do
 done <<< "$rm_pre"
 rm_out+="]"
 
-printf '{"is_git":true,"default_branch":%s,"default_branch_source":"%s","current_branch":%s,"remote_reachable":%s,"protected_from_rulesets":%s,"local_merge_base":%s,"remote_merge_base":%s,"remote_base_unverified":%s,"protected":%s,"local_merged_candidates":%s,"local_stale_unmerged_report":%s,"remote_merged_candidates":%s,"warnings":%s}\n' \
+# worktree 检出报告（只报告，不作为删除判据）
+wt_branches="$(git worktree list --porcelain 2>/dev/null | sed -n 's/^branch refs\/heads\///p' | awk 'NF' | sort -u)"
+
+printf '{"is_git":true,"default_branch":%s,"default_branch_source":"%s","current_branch":%s,"remote_reachable":%s,"protected_from_rulesets":%s,"local_merge_base":%s,"remote_merge_base":%s,"remote_base_unverified":%s,"protected":%s,"local_merged_candidates":%s,"local_stale_unmerged_report":%s,"remote_merged_candidates":%s,"worktree_branches":%s,"warnings":%s}\n' \
   "$(jstr "$DEFAULT")" "$(jes "$DEFAULT_SOURCE")" "$(jstr "$current")" "$remote_reachable" \
   "$(printf '%s\n' "$protected_rulesets" | jarr_str)" "$(jstr "$local_merge_base")" "$(jstr "$remote_merge_base")" "$remote_base_unverified" \
   "$(printf '%s\n' "$protected" | jarr_str)" "$lm_out" "$ls_out" "$rm_out" \
-  "$(printf '%s\n' "$warns" | jarr_str)"
+  "$(printf '%s\n' "$wt_branches" | jarr_str)" "$(printf '%s\n' "$warns" | jarr_str)"

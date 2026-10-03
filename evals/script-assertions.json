@@ -902,6 +902,29 @@
       "path": "todo_fixme",
       "op": "is_empty_array",
       "note": "F3 判别项：mktemp 模板里的 XXXXXXXX 是 X 占位符，不得被 XXX 模式命中（该 fixture 只有这一种 X 串，没有真 TODO）"
+    },
+    {
+      "id": "F6-worktree-main",
+      "fixtures": [
+        "F6"
+      ],
+      "script": "branch_cleanup_audit",
+      "impl": "*",
+      "path": "worktree_branches",
+      "op": "contains",
+      "value": "main",
+      "note": "worktree 应报告当前分支被检出"
+    },
+    {
+      "id": "F3-worktree-empty",
+      "fixtures": [
+        "F3"
+      ],
+      "script": "branch_cleanup_audit",
+      "impl": "*",
+      "path": "worktree_branches",
+      "op": "is_empty_array",
+      "note": "detached HEAD 无 branch 行"
     }
   ]
 }
