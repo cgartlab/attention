@@ -1,9 +1,10 @@
 name: CI
 
 # 商业级门禁：任何 push / PR 都必须过三层校验与冒烟，且两种 shell、两个 OS 各跑一遍。
+# 触发收窄到 main：功能分支的改动由 PR（base=main）承载校验，避免每个中间 push 都烧一遍额度。
 on:
   push:
-    branches: ['**']
+    branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
