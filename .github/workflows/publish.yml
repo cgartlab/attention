@@ -34,7 +34,7 @@ jobs:
       version: ""
       publish-clawhub: true
       publish-skillhub: true
-      dry-run: ${{{{ inputs.dry_run || false }}}}
+      dry-run: ${{ inputs.dry_run || false }}
     secrets:
-      CLAWHUB_TOKEN: ${{{{ secrets.CLAWHUB_TOKEN }}}}
-      SKILLHUB_API_KEY: ${{{{ secrets.SKILLHUB_API_KEY }}}}
+      CLAWHUB_TOKEN: ${{ secrets.CLAWHUB_TOKEN }}
+      SKILLHUB_API_KEY: ${{ secrets.SKILLHUB_API_KEY }}
