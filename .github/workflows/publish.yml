@@ -1,0 +1,40 @@
+name: Publish to skill registries
+
+# Publishes this skill to ClawHub and SkillHub whenever a GitHub Release is
+# published. The work lives in the reusable workflow at
+# cgartlab/cgartlab-skills/.github/workflows/publish-skill.yml so a fix lands
+# once for every skill repo.
+#
+# Prerequisites (already configured as repo secrets):
+#   CLAWHUB_TOKEN, SKILLHUB_API_KEY
+#
+# Manual run: "Run workflow" republishes the default branch.
+# Set dry_run=true to validate and package without contacting either registry.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Validate and package only - do not publish"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    uses: cgartlab/cgartlab-skills/.github/workflows/publish-skill.yml@main
+    with:
+      skill-dir: "."
+      slug: cgartlab-attention
+      display-name: "CGArtLab Attention"
+      version: ""
+      publish-clawhub: true
+      publish-skillhub: true
+      dry-run: ${{{{ inputs.dry_run || false }}}}
+    secrets:
+      CLAWHUB_TOKEN: ${{{{ secrets.CLAWHUB_TOKEN }}}}
+      SKILLHUB_API_KEY: ${{{{ secrets.SKILLHUB_API_KEY }}}}
