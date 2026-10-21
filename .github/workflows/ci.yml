@@ -1,7 +1,12 @@
 name: CI
 
-# 商业级门禁：任何 push / PR 都必须过三层校验与冒烟，且两种 shell、两个 OS 各跑一遍。
+# 商业级门禁：任何 push / PR 都必须过三层校验与冒烟，且两种 shell 各跑一遍。
 # 触发收窄到 main：功能分支的改动由 PR（base=main）承载校验，避免每个中间 push 都烧一遍额度。
+#
+# 两个 job 都跑在 ubuntu-latest。原 windows job 的 .ps1 侧校验保留，
+# 只是换成 Linux 上的 pwsh（GitHub 托管 runner 自带）。
+# 原因：windows-latest 按 2 倍计费，289 分钟/月 = 578 额度分钟，占免费额度 29%，
+# 而 .ps1 逻辑本身与 OS 无关（脚本用 Get-Command bash 探测，不依赖 Windows 路径）。
 on:
   push:
     branches: [main]
@@ -19,31 +24,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  windows:
-    name: windows / pwsh
-    runs-on: windows-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: 版本与依赖自述（排障用）
-        shell: pwsh
-        run: |
-          $PSVersionTable.PSVersion.ToString()
-          git --version
-          & 'C:\Program Files\Git\bin\bash.exe' -c 'bash --version | head -1'
-
-      # 三层校验：严格 JSON + .sh/.ps1 逐字段 parity + 断言表
-      # 该 runner 会自动探测 bash（Git for Windows）并同时跑两套实现
-      - name: run_evals（pwsh runner，含 bash 侧 parity）
-        shell: pwsh
-        run: pwsh -NoProfile -File evals/run_evals.ps1 -FixturesDir "$env:TEMP\attention-evals-ci"
-
-      - name: smoke_test（双实现语义断言）
-        shell: pwsh
-        run: pwsh -NoProfile -File scripts/smoke_test.ps1 --repo .
-
-  linux:
+  bash:
     name: linux / bash
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -78,3 +59,27 @@ jobs:
           tmp="$(mktemp -d)"
           bash scripts/smoke_test.sh --repo "$tmp"
           echo "负例与正例均符合预期"
+
+  pwsh:
+    name: linux / pwsh
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 版本与依赖自述（排障用）
+        shell: pwsh
+        run: |
+          $PSVersionTable.PSVersion.ToString()
+          git --version
+          bash --version | Select-Object -First 1
+
+      # 三层校验：严格 JSON + .sh/.ps1 逐字段 parity + 断言表
+      # runner 会自动探测 bash 并同时跑两套实现
+      - name: run_evals（pwsh runner，含 bash 侧 parity）
+        shell: pwsh
+        run: pwsh -NoProfile -File evals/run_evals.ps1 -FixturesDir "$env:TEMP/attention-evals-ci"
+
+      - name: smoke_test（双实现语义断言）
+        shell: pwsh
+        run: pwsh -NoProfile -File scripts/smoke_test.ps1 --repo .
