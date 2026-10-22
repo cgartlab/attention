@@ -127,7 +127,7 @@
 
 ## 八、P6 阶段
 
-- **度量先行**：新增 `evals/`（现为 21 个 fixture + 81 条断言 + 双实现 runner，三层校验：严格 JSON / parity / 断言表）。**先建度量再改代码**——此前的 3 类缺陷之所以能长期存活，正是因为没有任何断言能发现它们。
+- **度量先行**：新增 `evals/`（现为 21 个 fixture + 83 条断言 + 双实现 runner，三层校验：严格 JSON / parity / 断言表）。**先建度量再改代码**——此前的 3 类缺陷之所以能长期存活，正是因为没有任何断言能发现它们。
 - **契约硬化**：`scan-recipes.md` 确立四条元规则（路径形态、`null` vs `[]`、失败必须可见、字段名即语义），并新增 `unpushed_branches`、`remote_reachable`、`release_signals`、`monorepo_mode`/`packages`、`remote_url_masked`、`gh_query_state` 等字段；`docs_needing_update` 更名为 `docs_mentioning_changes`（旧名会诱导"文档无需更新"的误读）。
 - **脚本成对修复**：16 项（`--repo` 校验、漏值死循环、`.sh` 非法 JSON、`release_involved` 恒 false、parity 漂移、颜色注入、`.gitignore` 尊重、未跟踪 TODO、宿主解析与脱敏等），`.sh` 与 `.ps1` 同步。
 - **SKILL.md 去冗余 + 补缺口**：删除全部内联"速查副本"（历次硬伤的共同根因），只留路由 + 三条铁律；新增 **Phase 2.5 意图分流**（干净态也可能有交付任务；该半阶段后续已并入 Phase 2 的统一"状态 × 意图"分流表，不再单列）、**工作分支步骤**、**非交互环境 fallback**（无 `ask_user_question` 时停下等确认，禁止自批）、幂等规则、报告可发布判定。

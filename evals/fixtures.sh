@@ -134,26 +134,35 @@ mk_plain_dir() { mkdir -p -- "$1" || die "无法创建目录: $1"; }
 
 init_repo() {
   mkdir -p -- "$1" || die "无法创建目录: $1"
-  git -C "$1" init -q -b main >/dev/null 2>&1
+  # git 是原生程序：在关掉了 MSYS 路径转换的环境（例如 MSYS2_ARG_CONV_EXCL=*）里，传 POSIX 路径
+  # 会让它直接 'cannot change to'。这类失败绝不能吞——否则 fixture 悄悄退化成"非 git 目录"，
+  # 回归会报一屏"字段不存在"（实测 152 条假失败），把"生成失败"伪装成"断言失败"。
+  local _err
+  _err=$(git -C "$1" init -q -b main 2>&1) || die "git init 失败（$1）: $_err"
   git -C "$1" config user.email 'dev@example.com' >/dev/null 2>&1
   git -C "$1" config user.name 'Dev Example' >/dev/null 2>&1
   git -C "$1" config commit.gpgsign false >/dev/null 2>&1
 }
 
 add_commit() { # <repo> <message> [body] [date]
-  local repo=$1 msg=$2 body=${3:-} date_arg=${4:-}
-  git -C "$repo" add -A >/dev/null 2>&1
+  local repo=$1 msg=$2 body=${3:-} date_arg=${4:-} _err
+  git -C "$repo" add -A >/dev/null 2>&1 || die "git add 失败（$repo）"
   # git commit --date 只设 author date；陈旧分支判定看的是 committer date（%cI），
   # 所以传了 date 时必须同时设 GIT_COMMITTER_DATE。.ps1 用 set/restore 环境变量，
   # 这里用「命令前置变量」，效果等价且不会泄漏到其它 git 调用。
+  # 提交失败同样是"静默毁 fixture"的高危点（空仓库照样 exit 0），故一并炸出来。
   if [ -n "$body" ] && [ -n "$date_arg" ]; then
-    GIT_COMMITTER_DATE="$date_arg" git -C "$repo" commit -q -m "$msg" -m "$body" --date "$date_arg" >/dev/null 2>&1
+    _err=$(GIT_COMMITTER_DATE="$date_arg" git -C "$repo" commit -q -m "$msg" -m "$body" --date "$date_arg" 2>&1) \
+      || die "git commit 失败（$repo）: $msg -- $_err"
   elif [ -n "$body" ]; then
-    git -C "$repo" commit -q -m "$msg" -m "$body" >/dev/null 2>&1
+    _err=$(git -C "$repo" commit -q -m "$msg" -m "$body" 2>&1) \
+      || die "git commit 失败（$repo）: $msg -- $_err"
   elif [ -n "$date_arg" ]; then
-    GIT_COMMITTER_DATE="$date_arg" git -C "$repo" commit -q -m "$msg" --date "$date_arg" >/dev/null 2>&1
+    _err=$(GIT_COMMITTER_DATE="$date_arg" git -C "$repo" commit -q -m "$msg" --date "$date_arg" 2>&1) \
+      || die "git commit 失败（$repo）: $msg -- $_err"
   else
-    git -C "$repo" commit -q -m "$msg" >/dev/null 2>&1
+    _err=$(git -C "$repo" commit -q -m "$msg" 2>&1) \
+      || die "git commit 失败（$repo）: $msg -- $_err"
   fi
 }
 

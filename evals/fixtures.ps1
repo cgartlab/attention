@@ -22,11 +22,21 @@ if (-not $OutDir) { $OutDir = Join-Path ([System.IO.Path]::GetTempPath()) 'atten
 if (Test-Path $OutDir) { Remove-Item $OutDir -Recurse -Force -ErrorAction SilentlyContinue }
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 
+# 与 fixtures.sh 的 die 对齐：失败写 stderr 并退出 2（throw 的退出码是 1，会让两侧退出码不一致）
+function Fail {
+  param([string]$Message)
+  [Console]::Error.WriteLine("fixtures.ps1: $Message")
+  exit 2
+}
+
 function New-FixtureRepo {
   param([string]$Id)
   $p = Join-Path $OutDir $Id
   New-Item -ItemType Directory -Force -Path $p | Out-Null
-  & git -C $p init -q -b main 2>&1 | Out-Null
+  # git 失败绝不能吞（对齐 fixtures.sh）：否则 fixture 悄悄退化成"非 git 目录"，
+  # 回归会报一屏"字段不存在"（实测 152 条假失败），把"生成失败"伪装成"断言失败"。
+  $initErr = (& git -C $p init -q -b main 2>&1 | Out-String).Trim()
+  if ($LASTEXITCODE -ne 0) { Fail "git init 失败（$p）: $initErr" }
   & git -C $p config user.email 'dev@example.com' 2>&1 | Out-Null
   & git -C $p config user.name 'Dev Example' 2>&1 | Out-Null
   & git -C $p config commit.gpgsign false 2>&1 | Out-Null
@@ -52,14 +62,18 @@ function Set-FileContent {
 function Add-Commit {
   param([string]$Repo, [string]$Message, [string]$Body, [string]$Date)
   & git -C $Repo add -A 2>&1 | Out-Null
+  if ($LASTEXITCODE -ne 0) { Fail "git add 失败（$Repo）" }
   $argv = @('-C', $Repo, 'commit', '-q', '-m', $Message)
   if ($Body) { $argv += @('-m', $Body) }
   if ($Date) { $argv += @('--date', $Date) }
   # git commit --date 只设 author date；陈旧分支判定用 committer date（%cI），故必须同时设 GIT_COMMITTER_DATE
   $prevC = $env:GIT_COMMITTER_DATE
   if ($Date) { $env:GIT_COMMITTER_DATE = $Date }
-  & git @argv 2>&1 | Out-Null
+  # 提交失败同样是"静默毁 fixture"的高危点（空仓库照样 exit 0），故炸出来（对齐 fixtures.sh）
+  $commitErr = (& git @argv 2>&1 | Out-String).Trim()
+  $commitCode = $LASTEXITCODE
   if ($Date) { if ($null -ne $prevC) { $env:GIT_COMMITTER_DATE = $prevC } else { Remove-Item Env:\GIT_COMMITTER_DATE -ErrorAction SilentlyContinue } }
+  if ($commitCode -ne 0) { Fail "git commit 失败（$Repo）: $Message -- $commitErr" }
 }
 function Set-FakeRemote {
   param([string]$Repo, [string]$Url, [hashtable]$ExtraRefs)

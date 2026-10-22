@@ -5,7 +5,12 @@
 > 版本策略：技能尚不完善，当前保持 0.1.0；以下未发布变更记于 [Unreleased]，待通用化成熟后由用户决定再切版本号。
 
 ## [Unreleased]
-> 暂无未发布变更。
+
+### Fixed
+- **fixture 生成不再吞掉 git 失败**（`evals/fixtures.sh` / `evals/fixtures.ps1`）：`git init` / `git add` / `git commit` 失败现在退出 2 并打印 git 原始 stderr，runner 随之报"fixtures.sh 失败"。此前这些调用一律 `>/dev/null 2>&1`，于是在关掉 MSYS 路径转换的 shell（`MSYS2_ARG_CONV_EXCL=*`，某些 Agent 运行时会设置）里 `git -C /c/...` 报 `cannot change to`、21 个 fixture 全部退化成"非 git 目录"，生成器照样 exit 0——回归因此报出 **152 条"字段不存在"假失败**，把"生成失败"伪装成"断言失败"。
+
+### Docs
+- 断言条数与校验总数同步真实值：`AGENTS.md`、`README.md`、`docs/DEVELOPMENT-PLAN.md`、`docs/VALIDATION.md` 此前仍写"81 条断言"，实际为 83 条；`docs/VALIDATION.md` §2 的回归结果由 553 更新为 557 checks，并新增"fixture 生成失败必须可见"的说明与手工复现命令。
 
 ## [0.1.1](https://github.com/cgartlab/attention/compare/v0.1.0...v0.1.1) - 2026-10-03
 > **一句话概括**：本版把“交付策略”“信号去噪”“worktree 报告”写入规范，并更新 logo 与 app icon、修复文档勘误。对使用者：脏态判定更准确、worktree 报告更完整、品牌标识更清晰。**无需立即行动，常规拉取即可。**
