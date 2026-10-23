@@ -95,7 +95,7 @@ attention/
 仓库自带可复现的回归，不靠"人肉记得跑"：
 
 ```powershell
-# 三层校验：严格 JSON（RFC 8259）+ .sh/.ps1 逐字段 parity + 断言表（21 个 fixture、81 条断言）
+# 三层校验：严格 JSON（RFC 8259）+ .sh/.ps1 逐字段 parity + 断言表（21 个 fixture、83 条断言）
 pwsh -NoProfile -File evals/run_evals.ps1
 bash evals/run_evals.sh                 # bash 侧（建议有 python3）
 
