@@ -130,6 +130,17 @@ Phase 4 收尾报告（含可发布判定）
 5. **合并门**：四层全过才可合并；**强 UI 改动永不自动合并**，必须截图 + 人工确认（`references/issue-pr-loop.md` §8.3）。否则：能修则修 → 修不了按 `assets/templates/issue-pr-comment.md` 回复 → 确应放弃则**先评论后关闭**。
 6. **收尾**：合并后删源分支（带 lease）→ 回默认分支 → 再走一次 Phase 3A；报告按 `status-report.md` 加"本轮对象"。
 
+## Phase 3C — 值守循环（issue / PR）
+
+> 本路径服务"持续性值守"意图（巡检 open issue、处理某个 issue / PR、把 PR 修到可合并、评审或合并。**判定口径**（triage / UI 白名单 / 合并门四层 / 关闭判据）见 `references/judgment-criteria.md`；**动作档位**（评论 / 合并 / 关闭）见 `references/autonomy-and-safety.md`。这里只给顺序。
+
+1. **前置门**：非 GitHub / 未登录 / `gh_query_state!="ok"` → 只报告"没查成"，不进循环；工作区脏 → 不提交，问（Phase 2 表）。
+2. **选对象**：`gh issue list --json …` 实时查（**不得**用 `open_issues` 字段做 triage，它只有一行标题），过 triage 门，**本轮只取一个**。
+3. **查重**：三条线索命中即"已有相关 PR"→ 走评审；都不中 → 走实现。
+4. **实现 / 评审**：无 PR → 拉最新默认分支、建 `<type>/<issue>-<slug>`、连同类问题一并修、走 3B 两道门槛、`gh pr create`（body 首行 `Closes #<n>`）；有 PR → 按 `assets/templates/pr-review.md` **逐行**读 diff，并在隔离 worktree **实跑**留证（命令+退出码+计数），未决反馈先解决。自己的 PR 同样过一遍。
+5. **合并门**：四层全过才可合并；**强 UI 改动永不自动合并**，必须截图 + 人工确认（`references/issue-pr-loop.md` §8.3）。否则：能修则修 → 修不了按 `assets/templates/issue-pr-comment.md` 回复 → 确应放弃则**先评论后关闭**。
+6. **收尾**：合并后删源分支（带 lease）→ 回默认分支 → 再走一次 Phase 3A；报告按 `status-report.md` 加"本轮对象"。
+
 ## Phase 4 — 收尾报告
 
 结构、可发布判定（READY / NOT READY / BLOCKED）、CRITICAL/WARNING/SUGGESTION 分级、大白话语言规则与脱敏要求，**全部见 `assets/templates/status-report.md`**（含 ❌/✓ 正反例）。一条底线：报告要能让人**立刻知道下一步干什么**，字段名与命令串只进末尾"📋 技术细节（可选）"小节。

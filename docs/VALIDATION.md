@@ -32,13 +32,15 @@ bash scripts/smoke_test.sh --repo .
 
 | 校验 | 命令 | 结果 |
 |---|---|---|
-| 三层校验（pwsh 侧 runner） | `pwsh -NoProfile -File evals/run_evals.ps1` | **553 passed / 0 failed / 553** |
-| 三层校验（bash 侧 runner，独立实现） | `bash evals/run_evals.sh` | **553 passed / 0 failed / 553** |
+| 三层校验（pwsh 侧 runner） | `pwsh -NoProfile -File evals/run_evals.ps1` | **557 passed / 0 failed / 557** |
+| 三层校验（bash 侧 runner，独立实现） | `bash evals/run_evals.sh` | **557 passed / 0 failed / 557** |
 | 快速冒烟（双实现 + 负例） | `pwsh …/smoke_test.ps1 --repo .` | 5 passed / 0 failed |
 | 快速冒烟（bash） | `bash …/smoke_test.sh --repo .` | 5 passed / 0 failed |
 | `--repo` 无效 | `… --repo <不存在>` | 两实现均 `[FAIL] --repo path not found`、退出 1（**不再静默分析当前目录**） |
 
-**三层校验**：① 严格 JSON——`System.Text.Json` / python `json.load` 解析，拒绝字符串内裸控制字符；② parity——同 fixture、同参数下 `.sh` 与 `.ps1` 的**字段集与逐字段值**必须一致（路径形态、数组顺序、`null` vs `[]` 全算差异）；③ 断言表——`evals/script-assertions.json`（81 条）。
+**三层校验**：① 严格 JSON——`System.Text.Json` / python `json.load` 解析，拒绝字符串内裸控制字符；② parity——同 fixture、同参数下 `.sh` 与 `.ps1` 的**字段集与逐字段值**必须一致（路径形态、数组顺序、`null` vs `[]` 全算差异）；③ 断言表——`evals/script-assertions.json`（83 条）。
+
+**fixture 生成失败必须可见**：`fixtures.sh` / `fixtures.ps1` 里的 `git init` / `git add` / `git commit` 一旦失败即退出 2 并打印 git 原始 stderr，runner 随之报"fixtures.sh 失败"（退出码 2）。原因：在关掉 MSYS 路径转换的 shell（`MSYS2_ARG_CONV_EXCL=*`，某些 Agent 运行时会设置）里，`git -C /c/...` 直接 `cannot change to`，21 个 fixture 会全部退化成"非 git 目录"——此前这些失败被 `2>&1 >/dev/null` 吞掉，runner 于是报出 152 条"字段不存在"，看起来像断言回归。手工复现：`MSYS2_ARG_CONV_EXCL='*' bash evals/run_evals.sh` 应立刻以退出码 2 停下；若报的是一屏失败，说明该防护被改坏了。
 
 **改前基线（同一套断言、原始脚本）**：用 `git worktree add --detach <path> HEAD` 取未修改的脚本，把 `evals/` 复制进去，跑**同一个 runner 与同一份断言表**：
 
@@ -59,6 +61,7 @@ bash scripts/smoke_test.sh --repo .
 | 批次 A（`branch_cleanup_audit`） | 479 / **12** / 491 | 本地/远程合并基准分离 + 基准守卫 + `cleanup.protect` + `gh rules` |
 | 终态（+ 版本改造、`tip_sha`、端点纠偏） | **493 / 0 / 493** | pwsh 与 bash 两套 runner 结果一致 |
 | 第三轮（4 项巡检缺陷修复 + gh_authed 探测改本地） | **553 / 0 / 553** | pwsh 与 bash 两套 runner 结果一致 |
+| 第四轮（fixture 生成失败改为显式报错） | **557 / 0 / 557** | 两套 runner 一致；fixture 生成失败路径单独验证为退出 2 |
 
 本轮修正的是一处**由 P6 引入的回归**：P6 把"本地合并判定"也改用了 `origin/<默认分支>`，导致"本地已合并、尚未推送"的分支被**漏报成空集**（假阴性）。现在本地用本地默认分支、远程用 `origin/<默认分支>` 并加基准守卫（`remote_base_unverified` + 警告）。F18/F19 覆盖这两个方向。
 
