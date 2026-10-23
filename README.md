@@ -13,13 +13,14 @@
   <a href="https://github.com/cgartlab/attention/releases/tag/v0.1.0"><img alt="release v0.1.0" src="https://img.shields.io/badge/release-v0.1.0-success"></a>
   <img alt="skill version 0.1.0" src="https://img.shields.io/badge/skill_version-0.1.0-2563eb">
   <a href="https://github.com/cgartlab/attention/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/cgartlab/attention/actions/workflows/ci.yml/badge.svg"></a>
-  <img alt="checks: 553 passed" src="https://img.shields.io/badge/checks-553_passed-3fb950">
+  <a href="https://skills.sh/cgartlab/attention"><img alt="skills.sh" src="https://skills.sh/b/cgartlab/attention"></a>
+  <img alt="checks: 557 passed" src="https://img.shields.io/badge/checks-557_passed-3fb950">
   <img alt="shell: bash + pwsh" src="https://img.shields.io/badge/shell-bash_%2B_pwsh-4EAA25">
   <img alt="runtime deps: git only" src="https://img.shields.io/badge/runtime-git_only-lightgrey">
   <a href="LICENSE"><img alt="license: CC-BY-NC-SA-4.0" src="https://img.shields.io/badge/License-CC--BY--NC--SA--4.0-lightgrey"></a>
 </p>
 
-> **徽章说明**：本仓库是 **private**，shields.io 读不到私有仓库的动态数据，故 `release` / `skill_version` / `checks` 为**静态徽章**（随发版手改，`checks` 数值取自最近一次发布门禁的全量结果）；`CI` 徽章为 GitHub 原生，**需有仓库读权限**才会显示。skills.sh 徽章只对公开仓库有效，故未使用。
+> **徽章说明**：本仓库已**公开**（public），`skills.sh`、`CI` 徽章可直接反映仓库状态；`release` / `skill_version` / `checks` 仍是**静态徽章**（随发版手改，`checks` 取自最近一次全量结果 557）。徽章变绿只代表流程跑通，**不代表某个 PR 已验证**——合并判据仍按 `judgment-criteria.md` 的合并门。
 
 ## 它做什么
 
@@ -43,11 +44,13 @@
 
 立正符合 [Agent Skills](https://agentskills.io) 开放标准（`SKILL.md` + `name`/`description` frontmatter），可装到兼容 harness（Claude Code、Codex、Cursor、OpenCode 等）。
 
-**⚠️ 本仓库托管为 private（私有）**：`skills` CLI **支持私有仓库**（用你已配置的 git 凭据 / `gh` / SSH），但**消费方必须有本仓库读权限**；skills.sh 徽章只对公开仓库有效，在本仓库上不显示。也可以直接"手动安装"：
+本仓库已**公开**，直接用 `skills` CLI 安装（会自动探测你机器上已装的 harness；已实测：克隆 → 识别 skill → 安装到检测到的 agent）：
 
 ```bash
-npx skills add cgartlab/attention   # 私有仓库亦可，但需有本仓库读权限（凭据由 gh/git 提供）
+npx skills add cgartlab/attention
 ```
+
+公开仓库上无需任何凭据；`skills.sh` 页面见 <https://skills.sh/cgartlab/attention>。
 
 **手动安装**（现在就能用）：把本仓库克隆/复制到你所用 harness 的 skills 目录。各 harness 的默认位置：
 
@@ -111,7 +114,8 @@ bash scripts/smoke_test.sh --repo .
 **已验证 / 未验证（诚实边界）**：
 
 - ✅ 已验证：双实现在 21 个 fixture 上输出严格合法 JSON 且逐字段一致；非 git 目录、零提交仓库、detached HEAD、CRLF 版本文件、被忽略目录内的版本文件、宿主误判、颜色注入等边界；`--repo` 无效与漏值不再静默/挂死。
-- ❌ 未验证：**任何远程操作**（本开发环境无法建立可用的远程传输：本地路径传输要过 shell、`git://` receive-pack 会挂死）；真实 GitHub PR 创建；`npx skills add` 安装链路（需先推送）；跨 harness 触发率。
+- ✅ 已验证（仓库公开后）：真实 GitHub PR 创建与合并流程、`npx skills add cgartlab/attention` 安装链路（克隆公开仓库 → 识别 1 个 skill → 非交互安装到检测到的 harness）。
+- ❌ 未验证：跨 harness 触发率（只在少数 harness 上跑过）、`publish.yml` 的 ClawHub/SkillHub 发布链路（依赖的上游 workflow 仓库仍为私有）。
 
 详见 `docs/VALIDATION.md`（验证记录）与 `docs/QUALITY-AUDIT.md`（本次审计查出的缺陷、复现方式与回归清单）。
 

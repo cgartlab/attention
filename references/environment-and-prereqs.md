@@ -45,6 +45,7 @@
 
 1. **bash 可用** → 用 `.sh`。
    - **探测方式（执行探测）**：跑 `bash -c 'echo ok'`，**看退出码为 0 且输出为 `ok`**。退出非 0、或输出里出现 `couldn't create signal pipe` 之类启动失败信息 → 判为不可用。
+   - **退出码不足以证明可用**：Windows 的 App Execution Alias 存根（`python3`、`node` 可能指向 `WindowsApps\` 下的商店存根）**退出 0 却什么都不输出**；用它跑解析器会"静默产出空结果"，最容易被读成"接口没数据/仓库为空"。凡由外部解释器承担解析，探测必须校验**可观察输出**，并在没有可用解释器时给出显式错误，而不是输出空。
    - **为什么不能"找到即用"**：`C:\Program Files\Git\bin\bash.exe` 在受限沙箱里**文件存在但一启动就失败**（cygwin 起不来——信号管道被沙箱拒绝）。存在式判据会选中一个必然失败的路径，之后每次脚本调用都报错，还会被误读成"仓库有问题"或"脚本坏了"。
    - 调用：`bash "<base>/scripts/<name>.sh" --repo <path>`。覆盖 Linux/macOS/WSL/Claude Code/Cursor。
    - **Windows 注意**：Git for Windows 自带 bash.exe 常不在 PATH，`command -v bash` 会漏。检测不到时由 git 安装路径推导全路径（如 `C:\Program Files\Git\bin\bash.exe`），**并用同一个执行探测**（`& "<该全路径>" -c "echo ok"`）确认它能跑起来，再采用。

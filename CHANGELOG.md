@@ -7,6 +7,8 @@
 ## [Unreleased]
 
 ### Added
+- **仓库转为公开（public），并补齐"公开可用"所需的一切**：README 徽章与安装说明改为公开口径（恢复 skills.sh 徽章、`checks` 557）；`npx skills add cgartlab/attention` **实测通过**（克隆公开仓库 → 识别 1 个 skill → 非交互安装到检测到的 harness）。
+- **把"在用打包副本"的知识增量收进仓库**（此前仓库落后于正在被加载的副本，公开即等于发布更弱的版本）：`references/common-pitfalls.md` 7 条 → **19 条**（含"CI job 几秒零步骤失败 = 计费/额度"、"合并冲突的 PR 根本不触发 workflow"、"数字类陈述在多份文档里同时腐烂"、"只更新流程不更新任务清单"）；`judgment-criteria.md` 新增「被 main 取代的分支（superseded）」判定（与「无价值分支」区分：前者废弃、后者剪枝）；`environment-and-prereqs.md` 补"退出 0 但输出为空 = 不可用"（Windows 商店存根）；`release-versioning.md` 补"维护者指定版本号与语义冲突"的处置；`core-docs-sync.md` 补"开发计划/任务清单也是核心文档"与"文档里的命令示例是可执行断言"；`SKILL.md` 补"续做"触发、"作用域=当前仓库"、已 staged 改动危险、远程动作验收看目标端、追加提交后同步 PR 描述。
 - **Phase 3C 值守循环（issue / PR）**：立正从"一次性收拾仓库"扩到"持续值守"——巡检 open issue → 按 triage 门选一个 → 查重（三条线索）→ 无 PR 则实现开 PR / 有 PR 则逐行评审并在隔离 worktree 实跑 → 过合并门四层 → 合并、或按判据评论/关闭。每轮只处理一个对象，幂等键为 issue 编号，进度只维护**一条**标记评论。流程单一事实源：`references/issue-pr-loop.md`。
 - `references/judgment-criteria.md` 新增四组判定：**issue triage 门**（A 动作意图 / B 内容可执行 / C 未被占用，含 P0/P1 倾斜与 stale 规则）、**UI 视觉改动白名单**（强 UI / 疑似 UI / 边界，判定只看 diff 路径）、**合并门四层**（客观信号 / 内容门 / 授权门 / 动作门）、**PR/issue 关闭判据**（重复 / 已被默认分支覆盖 / 方向冲突 / 不可复现，且"先评论后关闭"）。
 - `references/autonomy-and-safety.md` 动作档位表补齐三档：`gh pr merge`（须过合并门 + 有授权）、`gh pr close`/`gh issue close`(须先评论)、`gh issue/pr comment`/`gh pr review`（对外发言，需确认）；禁止清单新增五条（强 UI 自动合并、无授权合并、未评论关闭、未经确认对外发言、用旧截图冒充）。
