@@ -1,15 +1,16 @@
 name: Publish to skill registries
 
-# Publishes this skill to ClawHub and SkillHub whenever a GitHub Release is
-# published. The work lives in the reusable workflow at
-# cgartlab/cgartlab-skills/.github/workflows/publish-skill.yml so a fix lands
-# once for every skill repo.
+# 把本仓库作为 Agent Skill 发布到 ClawHub 与 SkillHub。
 #
-# Prerequisites (already configured as repo secrets):
-#   CLAWHUB_TOKEN, SKILLHUB_API_KEY
+# 为什么不再 uses: 上游 reusable workflow：那套流程住在
+# cgartlab/cgartlab-skills（私有）。本仓库转公开后，公开仓库调用私有仓库的
+# reusable workflow 不可行——发布链路会一直红在那里。因此把同样的步骤内联到本文件：版本解析、
+# slug 校验、SkillHub 的元数据注入都保持原样，只是不再跨仓库依赖。
 #
-# Manual run: "Run workflow" republishes the default branch.
-# Set dry_run=true to validate and package without contacting either registry.
+# 前置：仓库 secrets 需有 CLAWHUB_TOKEN（clh_...）与 SKILLHUB_API_KEY（skh_...）；
+# 缺了会在对应 job 里显式失败，不会静默跳过。
+#
+# 手动运行：Run workflow 会重新发布默认分支；dry_run=true 只校验并打包，不联系 registry。
 
 on:
   release:
@@ -25,16 +26,176 @@ permissions:
   contents: read
 
 jobs:
-  publish:
-    uses: cgartlab/cgartlab-skills/.github/workflows/publish-skill.yml@main
-    with:
-      skill-dir: "."
-      slug: cgartlab-attention
-      display-name: "CGArtLab Attention"
-      version: ""
-      publish-clawhub: true
-      publish-skillhub: true
-      dry-run: ${{ inputs.dry_run || false }}
-    secrets:
-      CLAWHUB_TOKEN: ${{ secrets.CLAWHUB_TOKEN }}
-      SKILLHUB_API_KEY: ${{ secrets.SKILLHUB_API_KEY }}
+  resolve:
+    name: Resolve version and slug
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read version from SKILL.md
+        id: meta
+        env:
+          SLUG: cgartlab-attention
+        run: |
+          set -euo pipefail
+          SKILL_MD="SKILL.md"
+          [ -f "$SKILL_MD" ] || { echo "::error::no SKILL.md"; exit 1; }
+
+          # 只读 frontmatter（前两个 --- 之间）。两种写法都接受：
+          #   version: 0.7.1                 （顶层）
+          #   metadata: 下的 version: "0.1.1" （嵌套，本仓库用这种）
+          VERSION="$(awk '
+            NR==1 && $0!="---" { exit }
+            NR>1 && $0=="---" { exit }
+            NR>1 && /^version:[[:space:]]*/ {
+              sub(/^version:[[:space:]]*/, ""); gsub(/["\047 ]/, ""); print; exit
+            }
+            NR>1 && /^metadata:[[:space:]]*$/ { inmeta=1; next }
+            inmeta && /^  version:[[:space:]]*/ {
+              sub(/^  version:[[:space:]]*/, ""); gsub(/["\047 ]/, ""); print; exit
+            }
+            inmeta && /^[^[:space:]]/ { inmeta=0 }
+          ' "$SKILL_MD")"
+
+          if [ -z "$VERSION" ]; then
+            echo "::error::could not resolve a version from SKILL.md frontmatter"
+            exit 1
+          fi
+          if ! printf '%s' "$VERSION" | grep -Eq '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'; then
+            echo "::error::version '$VERSION' is not valid SemVer"
+            exit 1
+          fi
+          if ! printf '%s' "$SLUG" | grep -Eq '^[a-z0-9]([a-z0-9-]*[a-z0-9])?$'; then
+            echo "::error::slug '$SLUG' is not kebab-case"
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "::notice::publishing $SLUG@$VERSION"
+
+  publish-clawhub:
+    name: Publish to ClawHub
+    needs: resolve
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install ClawHub CLI
+        run: npm install --global clawhub
+
+      - name: Check token
+        env:
+          CLAWHUB_TOKEN: ${{ secrets.CLAWHUB_TOKEN }}
+        run: |
+          if [ -z "$CLAWHUB_TOKEN" ]; then
+            echo "::error::CLAWHUB_TOKEN secret is not configured"
+            exit 1
+          fi
+
+      - name: Authenticate
+        env:
+          CLAWHUB_TOKEN: ${{ secrets.CLAWHUB_TOKEN }}
+        run: |
+          clawhub login --token "$CLAWHUB_TOKEN" --no-input
+          clawhub whoami
+
+      - name: Publish
+        env:
+          SLUG: cgartlab-attention
+          DISPLAY_NAME: "CGArtLab Attention"
+          VERSION: ${{ needs.resolve.outputs.version }}
+          DRY_RUN: ${{ inputs.dry_run || false }}
+        run: |
+          set -euo pipefail
+          ARGS=( "." --slug "$SLUG" --name "$DISPLAY_NAME" --version "$VERSION" )
+          if [ "$DRY_RUN" = "true" ]; then ARGS+=(--dry-run); fi
+          clawhub publish "${ARGS[@]}"
+          echo "::notice::ClawHub: $SLUG@$VERSION $( [ "$DRY_RUN" = "true" ] && echo '(dry run)' || echo 'published' )"
+
+  publish-skillhub:
+    name: Publish to SkillHub
+    needs: resolve
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      # SkillHub CLI 直接从 SKILL.md 读 slug / displayName，缺了就硬失败。与其要求每个
+      # skill 仓库都带 registry 专属 frontmatter，不如复制到 staging 目录再注入这两个字段
+      # （与原 reusable workflow 行为一致）。
+      - name: Stage skill with registry metadata
+        env:
+          SLUG: cgartlab-attention
+          DISPLAY_NAME: "CGArtLab Attention"
+          VERSION: ${{ needs.resolve.outputs.version }}
+        run: |
+          set -euo pipefail
+          STAGE="$RUNNER_TEMP/skillhub-stage"
+          rm -rf "$STAGE"
+          mkdir -p "$STAGE"
+          cp -a . "$STAGE/"
+          rm -rf "$STAGE/.git"
+
+          python3 - "$STAGE/SKILL.md" "$SLUG" "$DISPLAY_NAME" "$VERSION" <<'PY'
+          import sys
+          from pathlib import Path
+
+          path = Path(sys.argv[1])
+          slug, display, version = sys.argv[2], sys.argv[3], sys.argv[4]
+          text = path.read_text(encoding="utf-8")
+          if not text.startswith("---\n"):
+              raise SystemExit("SKILL.md does not start with YAML frontmatter")
+
+          lines = text.split("\n")
+          end = next(i for i in range(1, len(lines)) if lines[i] == "---")
+          body = [l for l in lines[1:end]
+                  if not l.startswith(("slug:", "displayName:", "version:"))]
+          injected = [f"slug: {slug}", f"displayName: {display}", f"version: {version}"]
+          path.write_text("\n".join(["---"] + injected + body + lines[end:]), encoding="utf-8")
+          print(f"injected slug={slug} displayName={display} version={version}")
+          PY
+
+      - name: Install SkillHub CLI
+        # 先下载再执行，不 pipe 到 bash（CWE-494）
+        run: |
+          set -euo pipefail
+          curl -fsSL https://skillhub.cn/install/install.sh -o /tmp/skillhub-install.sh
+          test -s /tmp/skillhub-install.sh
+          bash /tmp/skillhub-install.sh --cli-only
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Check token
+        env:
+          SKILLHUB_API_KEY: ${{ secrets.SKILLHUB_API_KEY }}
+        run: |
+          if [ -z "$SKILLHUB_API_KEY" ]; then
+            echo "::error::SKILLHUB_API_KEY secret is not configured"
+            exit 1
+          fi
+
+      - name: Authenticate
+        env:
+          SKILLHUB_API_KEY: ${{ secrets.SKILLHUB_API_KEY }}
+        run: |
+          skillhub login --key "$SKILLHUB_API_KEY"
+          skillhub auth whoami
+
+      - name: Publish
+        env:
+          SLUG: cgartlab-attention
+          VERSION: ${{ needs.resolve.outputs.version }}
+          DRY_RUN: ${{ inputs.dry_run || false }}
+        run: |
+          set -euo pipefail
+          ARGS=( "$RUNNER_TEMP/skillhub-stage" --version "$VERSION" )
+          if [ "$DRY_RUN" = "true" ]; then ARGS+=(--dry-run); fi
+          skillhub publish "${ARGS[@]}"
+          echo "::notice::SkillHub: $SLUG@$VERSION $( [ "$DRY_RUN" = "true" ] && echo '(dry run)' || echo 'published' )"

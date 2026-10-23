@@ -23,6 +23,7 @@
 - `assets/templates/status-report.md` 新增"本轮对象"一节（对象 / 做了什么 / 证据 / 结论 / 视觉判定）。
 
 ### Changed
+- **发布链路自持（不再依赖私有仓库）**：`.github/workflows/publish.yml` 原本 `uses:` `cgartlab/cgartlab-skills` 的 reusable workflow，而那是**私有**仓库——本仓库转公开后这条链路永远跑不通。现把同样的三个 job（`resolve` 解析版本/slug → `publish-clawhub` → `publish-skillhub`）内联进本仓库：版本解析（顶层或 `metadata.version` 两种写法）、SemVer 与 kebab-case 校验、SkillHub 的 `slug`/`displayName`/`version` 注入方式全部保持原样；secrets 缺失时显式失败，不静默跳过。
 - **脏态的提交权改为由意图决定**：用户要求"收拾/提交这个仓库"→ 按计划表提交；值守循环轮次里出现未提交改动 → 一律不提交、不 stash、不 pull，先问用户。此前循环沿用 3B 的自动提交，与"未提交改动禁止提交"的直接诉求冲突。
 - `SKILL.md` 的职责边界随之调整为三段：一次性收拾止于"已推送 / PR 已开"；值守循环在授权门通过时可走到"已合并"；"已部署 / 用户可见"始终不在范围内。
 
