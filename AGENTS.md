@@ -33,7 +33,7 @@
 
 ## evals/ 目录
 - `evals/fixtures.ps1` / `fixtures.sh`：生成 21 个 fixture（F1–F21，**默认落在系统临时目录**——在仓库内会让"非 git 目录"负例失效）。成对实现，改一个必须改另一个。
-- `evals/script-assertions.json`：断言表（唯一的期望值来源，当前 81 条）。**改断言等于改评测基准，必须同时说明理由**；不得为了变绿而放宽。
+- `evals/script-assertions.json`：断言表（唯一的期望值来源，当前 83 条）。**改断言等于改评测基准，必须同时说明理由**；不得为了变绿而放宽。
 - `evals/run_evals.ps1` / `run_evals.sh`：runner，结果写 `evals/results/`（入库，作为验证证据）。
 - **并发注意**：同时跑多个 runner 时用 `-FixturesDir`／`--out-dir` 指定不同目录，否则会互相删除重建 fixture 产生假失败。
 
