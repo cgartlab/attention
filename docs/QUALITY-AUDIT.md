@@ -62,6 +62,13 @@
 - 现象：文档只写函数名（不写文件名）时 `docs_needing_update` 恒为空（**漏报**）；刚按它改完文档后又因自指而误报。字段名本身诱导"文档无需更新"的误读。
 - 修复：更名 `docs_mentioning_changes` + 新增 `docs_stale_candidates` + 明确"门槛通过条件是逐条对照 diff"（断言 `F5`/契约 §4）。
 
+### D12 fixture 生成静默失败 → 152 条"字段不存在"假失败（2026-10-22 实测，另一轮）
+
+- 现象：在关掉 MSYS 路径转换的 shell（`MSYS2_ARG_CONV_EXCL=*`，部分 Agent 运行时会设置）里，`git -C /c/...` 直接报 `cannot change to`；两个 fixture 生成器把这些错误全丢了，**21 个 fixture 全部退化成"非 git 目录"而生成器仍 `exit 0`**。回归于是报 152 条"字段不存在"（557 中），读起来像断言或脚本回归，实际是 fixture 从未建成。
+- 复现：`MSYS2_ARG_CONV_EXCL='*' bash evals/run_evals.sh` → 修复前 `152 failed`；修复后立刻以**退出码 2** 停下并打印 git 原文。
+- 修复（PR #17）：`init_repo` / `New-FixtureRepo`、`add_commit` / `Add-Commit` 里的 `git init` / `add` / `commit` 失败即写 stderr 并退出 2（`.ps1` 新增 `Fail` 以对齐 `.sh` 的 `die`，否则两侧退出码一个是 1 一个是 2）。
+- 归类：与 D1 / D9 / D11 同属"**失败不可见**"。任何吞 stderr 的采集或生成步骤，都可能把"生成失败"伪装成"断言失败"（假红）或"没有该信号"（假绿）。评审清单 `assets/templates/pr-review.md` B 组第 1 条即为此设。
+
 ## 被这次审计推翻的历史声明
 
 1. `docs/VALIDATION.md` 曾称 "`.sh` 与 `.ps1` 输出一致（parity 确认）"——**已证伪**（见 D4/D3）。

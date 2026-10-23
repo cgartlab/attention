@@ -65,7 +65,7 @@ attention/
 ├── SKILL.md            # 触发与工作流（只做路由 + 三条铁律）
 ├── scripts/            # 黑盒采集脚本：bash(.sh) 与 PowerShell(.ps1) 两套
 ├── references/         # 按需加载的判断细则（含 scan-recipes.md 契约）
-├── assets/templates/   # 提交/PR/CHANGELOG/计划表/报告模板
+├── assets/templates/   # 提交/PR/CHANGELOG/计划表/报告 + 评审清单/评论话术模板
 ├── evals/              # 回归：21 个 fixture + 断言表 + 双实现 runner
 └── docs/               # 验证记录、质量审计、调研备忘
 ```
@@ -75,6 +75,8 @@ attention/
 ## 使用
 
 在任意 git 项目里对 agent 说"立正"或"同步/整理/检查这个项目""该提交了""开个 PR"等同义意图即可触发；英文场景说 "tidy up this repo and open a PR" 之类也会命中。详见 `SKILL.md` 的 description。
+
+说"巡检一下 open issue""把某个 PR 修到能合""帮我评审/合并"则进入**值守循环（Phase 3C）**：每轮只处理一个 issue 或 PR，逐行评审 + 隔离 worktree 实跑，合并门四层全过才谈合并；**视觉/UI 改动一律只交截图，不自动合并**。
 
 ## 脚本
 
@@ -95,7 +97,7 @@ attention/
 仓库自带可复现的回归，不靠"人肉记得跑"：
 
 ```powershell
-# 三层校验：严格 JSON（RFC 8259）+ .sh/.ps1 逐字段 parity + 断言表（21 个 fixture、81 条断言）
+# 三层校验：严格 JSON（RFC 8259）+ .sh/.ps1 逐字段 parity + 断言表（21 个 fixture、83 条断言）
 pwsh -NoProfile -File evals/run_evals.ps1
 bash evals/run_evals.sh                 # bash 侧（建议有 python3）
 

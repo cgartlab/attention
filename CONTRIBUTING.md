@@ -33,6 +33,7 @@ bash scripts/smoke_test.sh --repo .
 - **加规则要配对减规则**：加一条规则必须指出哪条可删或合并；`SKILL.md` 元规则净增长必须 ≤ 0。
 - **不得削弱断言**：`evals/script-assertions.json` 是评测基准；只允许新增，改既有断言必须在 PR 里说明理由。
 - **不许编造**：文档/版本/建议只反映真实 diff 与真实信号；"没查成"写成"没查成"（`null` + `warnings[]`），不得写成"没有"。
+- **值守动作有独立档位**：合并 / 关闭 issue·PR / 对外评论等，按 `references/autonomy-and-safety.md` 的档位执行；**视觉/UI 改动永不自动合并**（须截图 + 人工确认），一轮只处理一个对象，不做定时值守。
 
 ## 新增一个采集能力时
 
@@ -48,3 +49,5 @@ bash scripts/smoke_test.sh --repo .
 - [ ] `.sh` / `.ps1` 成对且 parity 绿
 - [ ] 契约/docs 已同步（含 `CHANGELOG.md` 的 `[Unreleased]`）
 - [ ] 提交信息符合 conventional commits，body 讲清 WHY
+- [ ] 按 `assets/templates/pr-review.md` 逐行过过一遍（重点：失败路径有没有被吞、`.sh`/`.ps1` 是否成对、断言是否被放宽、文档数字是否同步）
+- [ ] 视觉/UI 改动附改进后的真实截图（与分支 SHA 一致），并在 PR 里标注"等人工确认、不自动合并"
