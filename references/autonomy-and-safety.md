@@ -19,10 +19,14 @@
 
 | 动作 | 档位 |
 |---|---|
-| 五个采集脚本、`git fetch` / `log` / `ls-remote` / `rev-parse` / `status`、`gh` 查询 | 只读自动 |
+| 五个采集脚本、`git fetch` / `log` / `ls-remote` / `rev-parse` / `status`、`gh` **查询**（issue/PR 列表、view、diff、checks） | 只读自动 |
 | 编辑文件、`git add`、`git commit`、本地 `git tag`、`git pull --ff-only` | 本地变更（计划批准） |
 | 本地 `git branch -d`（已合并且非受保护） | 本地变更（计划批准）+ 适用"清场顺序" |
 | `git push`（任何分支）、`git push --delete`、`gh pr create`、`git push <remote> <tag>` | 远程不可逆（执行点确认） |
+| **`gh pr merge`**（改变默认分支） | 远程不可逆 + **必须过合并门四层**（`judgment-criteria.md`）+ 有授权；强 UI 改动**永不允许** |
+| **`gh pr close` / `gh issue close`** | 远程不可逆 + 必须先评论说明判据（`judgment-criteria.md` §关闭判据）+ 执行点确认 |
+| **`gh issue comment` / `gh pr comment` / `gh pr review`**（对外发言、会通知他人） | 远程写 + 对外可见：执行点确认；本轮已明示"自动回复"时可免问，但内容仍须遵守回复模板 |
+| **`gh issue edit` / 打标签 / 指派 / 改 milestone** | 远程写：**本 skill 不做**（除非用户明确要求） |
 | 远程删分支 | 远程不可逆 + **必带 lease**（见 `common-pitfalls.md` 第 6 条） |
 | `git branch -D`、删未合并分支、删默认/受保护分支、force push 默认分支、改 `.git/config`、`git stash drop`/`apply`/`pop`、删除未跟踪文件 | **禁止** |
 
@@ -59,10 +63,16 @@
 - 纳入 `.gitignore` 排除的文件（`node_modules`、`dist`、`.env` 等）。
 - 在 detached HEAD 下做脏态修复的提交（先提示切分支）。
 - 自动改 `.git/config`。
+- **强 UI / 疑似 UI 改动的 PR 自动合并**（`ui_touched` 判定见 `judgment-criteria.md`）——授权再明确也不行，必须有截图 + 人工确认。
+- **在没有授权的情况下合并任何 PR**；把"用户说过要交付/要开 PR"当成合并授权。
+- **未评论就关闭 issue/PR**；或因"暂时修不了"关闭（那是 `BLOCKED`）。
+- **未经确认就对外发言**（issue/PR 评论、评审）；用评论代替修复（能修就先修）。
+- **用旧截图 / 设计稿 / 文字描述冒充"改进后的有效截图"**；截图与分支 SHA 不一致也算冒充。
 
 ## 非交互环境（delegated / 无人值守 / 无 `ask_user_question`）
 - **只读分析可以照做**：Phase 0/1/2 的探测与判定、出候选清单、写报告草案，都不需要交互。
 - **一切变更动作与远程动作都必须停在确认点**：把完整计划（或干净态的剪枝候选）**写在回复里，然后停下等待用户确认**。
+- **无人值守（cron / CI / 委派）时，值守循环最高只能到 `PR READY`**：授权门第 1 档要求"当前对话明说"，定时任务没有对话，因此**永不自动合并、永不自动关闭、永不自动对外发言**；只产出待确认的建议与产物。
 - **不得自批**：把"没人可问"当成"默认同意"，会直接绕过分层确认模型——这是硬规则。宁可交一份"计划待确认"就结束，也不要先做了再说。
 - 同样适用于任何拿不到用户回应的通道：CI 任务、定时任务、被其他 agent 转交的执行。
 

@@ -10,6 +10,8 @@
 - **P3 无脚本回退 + 依赖最小化** ✅ 完成。
 - **P4 跨 harness evals** ✅ 完成：bash + pwsh，5 脚本 parity 全过（见 `docs/VALIDATION.md`）。
 - **P5 通用化打磨** 🔶 部分：多宿主 PR / missing_core_docs / AGENTS.md / smoke_test 已完成；i18n / CONTRIBUTING / 更多版本生态 待定。
+- **P6 质量加固** ✅ 完成：11 类实测缺陷修复 + `evals/` 三层校验（21 fixture / 83 断言 / 557 checks）。
+- **P7 值守循环（Phase 3C）** 🔶 部分：规则与清单已完成（PR #19）；**代码阶段按用户裁定暂缓**（零新增采集脚本）；端到端验证受 GitHub Actions 计费阻塞。
 - 关键里程碑：第 5 轮发现本环境自带 git-bash，使 P1 bash 验证与 P4 parity 成为可能；第 6 轮深度 parity 抓到 next_steps.sh 一个真 bug 并修。
 ## 一、调研发现（GitHub 类似 skill 与可移植性信号）
 
@@ -145,8 +147,46 @@ pwsh -NoProfile -File scripts/smoke_test.ps1 --repo .
 
 并明确记录**不可测边界**（`docs/VALIDATION.md`）：远程操作、真实 GitHub PR、`npx skills add` 安装链路在本开发环境不可验证——**不把"跑不了"写成"通过"**。
 
+---
+
 ## 十、P6 仍未覆盖（留给后续）
 
 - CI（依赖远程仓库；用户当前明确不建远程）。
 - 跨 harness 触发率评测（需要英文环境与多 harness，本环境只能做 DSH 侧）。
 - `docs/ecosystem-survey.md` 与 `docs/ecosystem-research/` 里的行业对照结论**尚未全部落地**（如守门工具链的规则集思路、分支清理工具的边界实验）——本阶段只吸收了与"版本/CHANGELOG/分支剪枝"直接相关的部分。
+
+# 附：P7 值守循环（2026-10-22）
+
+> 触发：需要"巡检 open issue → 处理或评审 → 合并 / 回复 / 关闭"的持续性工作流，且要求"每轮一件、实测通过才谈合并、视觉改动必须截图由人确认"。
+> 目标：把立正从"一次性收拾仓库"扩到"持续值守"，**但不放宽任何一道既有门槛**（文档同步门槛、发行版本门槛、分层确认模型全部照旧）。
+
+## 十一、P7 阶段（= Phase 3C）
+
+**已完成（文档，PR #19）**
+
+- `references/issue-pr-loop.md` — 流程单一事实源：轮次与幂等键（进度只维护一条标记评论）、前置门、选对象、查重三线索、实现/评审、隔离 worktree 实跑、合并门顺序、截图证据落法、回复/关闭、脏态特例。
+- `references/judgment-criteria.md` — 四组可判定口径：issue triage 门（意图/可执行/未被占用）、UI 视觉白名单（强/疑似/边界）、合并门四层（客观信号/内容门/授权门/动作门）、关闭判据（先评论后关闭）。
+- `references/autonomy-and-safety.md` — 新动作档位：`gh pr merge` / `gh pr close` / `gh issue close` / `gh issue|pr comment` / `gh pr review`；禁止清单 +5 条；无人值守封顶 `PR READY`。
+- 模板：`pr-review.md`（逐行评审清单，含"失败路径被吞"等真实事故条目）、`issue-pr-comment.md`（进度/阻塞/关闭理由/合并证据 + 强 UI 版）。
+- `SKILL.md` — Phase 3C（6 步路由）；**元规则仍 3 + 3 = 6 条**，Phase 6→7：只增流程不增规则。
+
+**未开始（用户裁定：等发话再动代码）**
+
+- **零新增采集脚本**：Phase 3C 用 `gh` 命令现查，因此 `scan-recipes.md` 契约、`evals/` 断言表、fixture **全部不变**（本次改动零代码 diff 即为证据）。
+- 待补（可选）：把 Phase 3C 的 `gh` 查询固化成 recipe 示例（仍在本 reference 内扩充，不新增脚本）。
+
+**阻塞（真实状态，不是"没做"）**
+
+- GitHub Actions 因账户计费/额度未恢复，PR #17 / #18 / #19 的 job 全部**未启动**（`steps: 0`，注解写明 spending limit）。合并门 L1 客观信号拿不到 → 这三个 PR 只能是 `PR READY`，不能是 `MERGED`。
+
+**验收（可判定）**
+
+- ✅ 规则层：引用完整性、规则预算、模板可用性——已核验。
+- ⬜ 端到端：从某个 open issue 走到 `MERGED`，或按关闭判据"先评论后关闭"；在此之前只能声称"规则可用"，**不得声称"端到端验证过"**。
+- ⬜ 首个真实样本：依赖更新类 PR（当前 #18）与 fixture 修复 PR（#17）——两者都卡在 CI 额度，恢复后按 Phase 3C 走一遍。
+
+## 十二、P7 仍未覆盖
+
+- 多 issue 批量处理（当前明确禁止：一轮一件，下一轮须用户发起）。
+- 定时值守（`cron`）——用户明确裁定不做。
+- 非 GitHub 宿主的 issue/PR 全套流程（仅保留"就绪产物 + 手动指引"降级）。
