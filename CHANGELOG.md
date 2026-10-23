@@ -5,7 +5,27 @@
 > 版本策略：技能尚不完善，当前保持 0.1.0；以下未发布变更记于 [Unreleased]，待通用化成熟后由用户决定再切版本号。
 
 ## [Unreleased]
-> 暂无未发布变更。
+
+### Added
+- **Phase 3C 值守循环（issue / PR）**：立正从"一次性收拾仓库"扩到"持续值守"——巡检 open issue → 按 triage 门选一个 → 查重（三条线索）→ 无 PR 则实现开 PR / 有 PR 则逐行评审并在隔离 worktree 实跑 → 过合并门四层 → 合并、或按判据评论/关闭。每轮只处理一个对象，幂等键为 issue 编号，进度只维护**一条**标记评论。流程单一事实源：`references/issue-pr-loop.md`。
+- `references/judgment-criteria.md` 新增四组判定：**issue triage 门**（A 动作意图 / B 内容可执行 / C 未被占用，含 P0/P1 倾斜与 stale 规则）、**UI 视觉改动白名单**（强 UI / 疑似 UI / 边界，判定只看 diff 路径）、**合并门四层**（客观信号 / 内容门 / 授权门 / 动作门）、**PR/issue 关闭判据**（重复 / 已被默认分支覆盖 / 方向冲突 / 不可复现，且"先评论后关闭"）。
+- `references/autonomy-and-safety.md` 动作档位表补齐三档：`gh pr merge`（须过合并门 + 有授权）、`gh pr close`/`gh issue close`(须先评论)、`gh issue/pr comment`/`gh pr review`（对外发言，需确认）；禁止清单新增五条（强 UI 自动合并、无授权合并、未评论关闭、未经确认对外发言、用旧截图冒充）。
+
+### 裁定写入（用户逐条拍板的口径）
+- **合并方式固定 squash**（`gh pr merge --squash`），不探测、不随仓库风格漂移。
+- **授权来源只两条**：当前对话明说 > PR 带 `auto-merge` 标签；不引入仓库内授权配置文件。
+- **UI 截图证据落独立分支** `attention/evidence-pr-<n>`（`docs/evidence/pr-<n>/`，raw URL 内联进 PR），不进默认分支。
+- **不做定时值守**：一轮一件，下一轮必须由用户发起；被委派/无人值守时最高只能到 `PR READY`。
+- **带图文档不算 UI**：任意 `.md` 里新增/修改图片引用 → 可自动合并；仅"文件名本身是视觉规范"（`design`/`visual`/`brand`/`logo`/`icon`/`theme`）仍按强 UI。
+- 两个新模板：`assets/templates/pr-review.md`（逐行评审清单：结构 / 逻辑 / 跨平台双实现 / 验证 / 文档事实 / 安全 / 视觉，含"失败路径被吞"这类真实事故条目）、`assets/templates/issue-pr-comment.md`（进度 / 阻塞 / 关闭理由 / 合并证据 + 强 UI 等待确认四种骨架）。
+- `assets/templates/status-report.md` 新增"本轮对象"一节（对象 / 做了什么 / 证据 / 结论 / 视觉判定）。
+
+### Changed
+- **脏态的提交权改为由意图决定**：用户要求"收拾/提交这个仓库"→ 按计划表提交；值守循环轮次里出现未提交改动 → 一律不提交、不 stash、不 pull，先问用户。此前循环沿用 3B 的自动提交，与"未提交改动禁止提交"的直接诉求冲突。
+- `SKILL.md` 的职责边界随之调整为三段：一次性收拾止于"已推送 / PR 已开"；值守循环在授权门通过时可走到"已合并"；"已部署 / 用户可见"始终不在范围内。
+
+### Docs
+- `AGENTS.md` 现状读数更新：规则仍 6 条，Phase 由 6 个增至 7 个（流程可以长，规则只减不增）。
 
 ## [0.1.1](https://github.com/cgartlab/attention/compare/v0.1.0...v0.1.1) - 2026-10-03
 > **一句话概括**：本版把“交付策略”“信号去噪”“worktree 报告”写入规范，并更新 logo 与 app icon、修复文档勘误。对使用者：脏态判定更准确、worktree 报告更完整、品牌标识更清晰。**无需立即行动，常规拉取即可。**
