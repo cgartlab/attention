@@ -31,6 +31,8 @@ metadata:
 
 - 用户明示"立正"。
 - 在 git 项目里，用户说"同步/整理/检查/提交这个项目""把项目弄干净""该提交了""开个 PR""让项目归位/就绪/可发布"等。
+- **续做**：用户说"继续开发/接着做/上次做到哪了" → 先走 Phase 1 快照 + Phase 2 分流，把"上次停在哪、还剩什么、门禁与 CI 的真实状态"讲清，再给编号选项让他裁定；**不要凭对话记忆直接写代码**（上一轮的状态可能已被别人或别的会话改掉）。续做还要补三类快照看不到的事实：① **CI 是真红还是根本没启动**（run 几秒结束 + `jobs[].steps == []` = 计费/额度/可见性，见 `references/common-pitfalls.md` 第 16 条）；② 核心文档里的命令示例是否还能执行；③ 仓库外部足迹是否与本地一致（远端仓库名、版本 vs tag/Release、registry slug、机器上已安装的副本）。
+- **作用域 = 当前仓库**：用户含糊指向"所有仓库 / 所有 skill"时，那是组合级任务，不是立正——先确认 scope，不要在一个仓库的流程里硬做整个组合的盘点。
 
 ## 何时不用
 
@@ -114,8 +116,19 @@ Phase 4 收尾报告（含可发布判定）
 4. **执行修复 + 逐步 verify**：应用编辑，每个改动点后立刻验证（跑测试 / 回读文件 / 重跑相关脚本）再进下一步。跑测试/lint/build 至绿；绿不了就如实报告阻塞器，不硬提交。
 5. **文档同步门槛（提交前）**：跑 `core_docs_relevance_scan`，按 `references/core-docs-sync.md` 更新核心文档（该扫描是低精度提示，判定口径见 `judgment-criteria.md` §门槛通过条件）；CHANGELOG 分节见 `references/changelog-sections.md`。含未消解 ［待补充］ 的文档要么不进提交，要么在 PR body 列为阻塞项。
 6. **发行版本门槛（提交前）**：按 `references/judgment-criteria.md` 的**多层门**判定——脚本给 `release_signals`（宽口径），**是否真的 bump 由你结合用户意图判定并说明理由**；需要 bump 时一致 bump 所有版本文件、补 CHANGELOG、记录 tag 计划。`consistent=null`（无版本文件）时不要声称"版本已一致"。
-7. **提交**：按探测到的提交规约，一个提交一个意图；body 讲 **WHY**（diff 已说明 WHAT）。**改动按逻辑分组，每组走独立分支 + PR（不创建 Issue）**——一个大改动可拆成多个 PR（如 fix + docs + feat 各一），便于逐个评审与回滚。模板见 `assets/templates/commit-message.md`。
-8. **推送与开 PR**：推送前做**远程动作最终确认**。GitHub → `gh pr create`（模板见 `assets/templates/pr-body.md`）；非 GitHub / CLI 不可用 / 远程不可达 → 输出 PR/MR 就绪产物（分支、diff 概览、建议标题正文、手动指引），**不编造**宿主专属命令。**不创建 Issue——最终交付物只有 PR**。开 PR 前先查是否已有同题开放 PR（`gh_query_state="ok"` 时才作数）。
+7. **提交**：按探测到的提交规约，一个提交一个意图；body 讲 **WHY**（diff 已说明 WHAT）。**先看 index**：仓库里可能有别人（或用户本人）已 staged 的改动，`git add <你的文件>` + 裸 `git commit` 会把它们一起吞掉（已 staged 的删除尤其危险）；只提交自己的文件用 `git commit -- <path>`。**改动按逻辑分组，每组走独立分支 + PR（不创建 Issue）**——一个大改动可拆成多个 PR（如 fix + docs + feat 各一），便于逐个评审与回滚。模板见 `assets/templates/commit-message.md`。
+8. **推送与开 PR**：推送前做**远程动作最终确认**。GitHub → `gh pr create`（模板见 `assets/templates/pr-body.md`）；非 GitHub / CLI 不可用 / 远程不可达 → 输出 PR/MR 就绪产物（分支、diff 概览、建议标题正文、手动指引），**不编造**宿主专属命令。**不创建 Issue——最终交付物只有 PR**。开 PR 前先查是否已有同题开放 PR（`gh_query_state="ok"` 时才作数）。**远程动作验收看目标端状态，不看 CI 结论**：job 变绿不等于事情发生了（发布/部署类 workflow 可能整段 skipped 而结论仍是 success）——合并、tag、Release、registry 版本号都要回读目标端确认。**追加提交后同步 PR 描述**（`gh pr edit --body-file`），否则评审者读到的还是第一个提交的范围。
+
+## Phase 3C — 值守循环（issue / PR）
+
+> 本路径服务"持续性值守"意图（巡检 open issue、处理某个 issue / PR、把 PR 修到可合并、评审或合并。**判定口径**（triage / UI 白名单 / 合并门四层 / 关闭判据）见 `references/judgment-criteria.md`；**动作档位**（评论 / 合并 / 关闭）见 `references/autonomy-and-safety.md`。这里只给顺序。
+
+1. **前置门**：非 GitHub / 未登录 / `gh_query_state!="ok"` → 只报告"没查成"，不进循环；工作区脏 → 不提交，问（Phase 2 表）。
+2. **选对象**：`gh issue list --json …` 实时查（**不得**用 `open_issues` 字段做 triage，它只有一行标题），过 triage 门，**本轮只取一个**。
+3. **查重**：三条线索命中即"已有相关 PR"→ 走评审；都不中 → 走实现。
+4. **实现 / 评审**：无 PR → 拉最新默认分支、建 `<type>/<issue>-<slug>`、连同类问题一并修、走 3B 两道门槛、`gh pr create`（body 首行 `Closes #<n>`）；有 PR → 按 `assets/templates/pr-review.md` **逐行**读 diff，并在隔离 worktree **实跑**留证（命令+退出码+计数），未决反馈先解决。自己的 PR 同样过一遍。
+5. **合并门**：四层全过才可合并；**强 UI 改动永不自动合并**，必须截图 + 人工确认（`references/issue-pr-loop.md` §8.3）。否则：能修则修 → 修不了按 `assets/templates/issue-pr-comment.md` 回复 → 确应放弃则**先评论后关闭**。
+6. **收尾**：合并后删源分支（带 lease）→ 回默认分支 → 再走一次 Phase 3A；报告按 `status-report.md` 加"本轮对象"。
 
 ## Phase 3C — 值守循环（issue / PR）
 

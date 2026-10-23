@@ -12,7 +12,8 @@
 - `references/autonomy-and-safety.md` 动作档位表补齐三档：`gh pr merge`（须过合并门 + 有授权）、`gh pr close`/`gh issue close`(须先评论)、`gh issue/pr comment`/`gh pr review`（对外发言，需确认）；禁止清单新增五条（强 UI 自动合并、无授权合并、未评论关闭、未经确认对外发言、用旧截图冒充）。
 - 两个新模板：`assets/templates/pr-review.md`（逐行评审清单：结构 / 逻辑 / 跨平台双实现 / 验证 / 文档事实 / 安全 / 视觉，含"失败路径被吞"这类真实事故条目）、`assets/templates/issue-pr-comment.md`（进度 / 阻塞 / 关闭理由 / 合并证据 + 强 UI 等待确认四种骨架）。
 - `assets/templates/status-report.md` 新增"本轮对象"一节（对象 / 做了什么 / 证据 / 结论 / 视觉判定）。
-
+- **仓库转为公开（public），并补齐"公开可用"所需的一切**：README 徽章与安装说明改为公开口径（恢复 skills.sh 徽章、`checks` 557）；`npx skills add cgartlab/attention` **实测通过**（克隆公开仓库 → 识别 1 个 skill → 非交互安装到检测到的 harness）。
+- **把"在用打包副本"的知识增量收进仓库**（此前仓库落后于正在被加载的副本，公开即等于发布更弱的版本）：`references/common-pitfalls.md` 7 条 → **19 条**（含"CI job 几秒零步骤失败 = 计费/额度"、"合并冲突的 PR 根本不触发 workflow"、"数字类陈述在多份文档里同时腐烂"、"只更新流程不更新任务清单"）；`judgment-criteria.md` 新增「被 main 取代的分支（superseded）」判定（与「无价值分支」区分：前者废弃、后者剪枝）；`environment-and-prereqs.md` 补"退出 0 但输出为空 = 不可用"（Windows 商店存根）；`release-versioning.md` 补"维护者指定版本号与语义冲突"的处置；`core-docs-sync.md` 补"开发计划/任务清单也是核心文档"与"文档里的命令示例是可执行断言"；`SKILL.md` 补"续做"触发、"作用域=当前仓库"、已 staged 改动危险、远程动作验收看目标端、追加提交后同步 PR 描述。
 ### 裁定写入（用户逐条拍板的口径）
 - **合并方式固定 squash**（`gh pr merge --squash`），不探测、不随仓库风格漂移。
 - **授权来源只两条**：当前对话明说 > PR 带 `auto-merge` 标签；不引入仓库内授权配置文件。
@@ -29,6 +30,7 @@
 - **脏态的提交权改为由意图决定**：用户要求"收拾/提交这个仓库"→ 按计划表提交；值守循环轮次里出现未提交改动 → 一律不提交、不 stash、不 pull，先问用户。此前循环沿用 3B 的自动提交，与"未提交改动禁止提交"的直接诉求冲突。
 - `SKILL.md` 的职责边界随之调整为三段：一次性收拾止于"已推送 / PR 已开"；值守循环在授权门通过时可走到"已合并"；"已部署 / 用户可见"始终不在范围内。
 
+- **发布链路自持（不再依赖私有仓库）**：`.github/workflows/publish.yml` 原本 `uses:` `cgartlab/cgartlab-skills` 的 reusable workflow，而那是**私有**仓库——本仓库转公开后这条链路永远跑不通。现把同样的三个 job（`resolve` 解析版本/slug → `publish-clawhub` → `publish-skillhub`）内联进本仓库：版本解析（顶层或 `metadata.version` 两种写法）、SemVer 与 kebab-case 校验、SkillHub 的 `slug`/`displayName`/`version` 注入方式全部保持原样；secrets 缺失时显式失败，不静默跳过。
 ### Docs
 - **任务列表（`docs/DEVELOPMENT-PLAN.md`）新增 P7 阶段**：P1–P6 进度补齐，P7 记为 🔶 部分完成——规则与清单已交付（PR #19），代码阶段按用户裁定暂缓（零新增脚本）；并列出可判定验收条件与"P7 仍未覆盖"（批量处理 / 定时值守 / 非 GitHub 宿主）。
 - **核心文档同步**：`README.md` 补值守循环触发说明与目录注释；`CONTRIBUTING.md` 硬规矩补"值守动作有独立档位、UI 永不自动合并"，PR 检查清单补逐行评审与截图两项；`docs/QUALITY-AUDIT.md` 新增 D12（fixture 生成静默失败 → 152 条假失败，属"失败不可见"类）；`AGENTS.md` 现状读数更新（规则仍 6 条，Phase 6→7）。

@@ -26,6 +26,7 @@
 4. 若不一致（`consistent=false`）：
    - 提议统一版本号（语义化版本：feat→minor、fix→patch、BREAKING→major；取最高值或用户意图）。
    - 用 `ask_user_question` 确认版本号，不擅自定。
+   - **维护者指定的版本号与语义推导冲突时，按维护者裁定执行**（他有版本节奏的上下文），但两件事不能省：CHANGELOG 保留**真实分节**（`feat` 内容仍写 `### Added`，不得为迁就版本号改写成 `### Fixed`）；交付时一句话点名偏差与纠正成本（版本字段 + CHANGELOG 标题 + 重打本地 tag 三处）。不得把"按维护者指定 bump"含糊成"版本已按语义对齐"。
    - 一致 bump **所有**版本承载文件，含 lockfile 里的声明。
 5. CHANGELOG：按 `changelog-sections.md` 判定分节与可见性、按 `../assets/templates/changelog-entry.md` 落格式，只写 diff 支撑的变化。**每条必须可溯源**（通用规则见 `core-docs-sync.md` 的"溯源要求"）。
 6. tag：记录"建议打 `vX.Y.Z` tag"的计划。
