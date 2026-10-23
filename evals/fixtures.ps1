@@ -18,9 +18,6 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-if (-not $OutDir) { $OutDir = Join-Path ([System.IO.Path]::GetTempPath()) 'attention-evals' }
-if (Test-Path $OutDir) { Remove-Item $OutDir -Recurse -Force -ErrorAction SilentlyContinue }
-New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 
 # 与 fixtures.sh 的 die 对齐：失败写 stderr 并退出 2（throw 的退出码是 1，会让两侧退出码不一致）
 function Fail {
@@ -28,6 +25,15 @@ function Fail {
   [Console]::Error.WriteLine("fixtures.ps1: $Message")
   exit 2
 }
+
+if (-not $OutDir) { $OutDir = Join-Path ([System.IO.Path]::GetTempPath()) 'attention-evals' }
+# 与 fixtures.sh 的根目录守卫对齐：下面是无条件 Remove-Item -Recurse，指错就是删盘。
+# 注意：Linux 上 $env:TEMP 为空，拼出 "/attention-evals-ci" 这类根下路径曾在 CI 首次真跑时炸掉。
+if ($OutDir.Trim() -match '^([\\/]+|[A-Za-z]:[\\/]?|\.|\.\.)$') {
+  Fail "拒绝把 -OutDir 指到文件系统根或当前目录: '$OutDir'"
+}
+if (Test-Path $OutDir) { Remove-Item $OutDir -Recurse -Force -ErrorAction SilentlyContinue }
+New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 
 function New-FixtureRepo {
   param([string]$Id)

@@ -78,7 +78,12 @@ jobs:
       # runner 会自动探测 bash 并同时跑两套实现
       - name: run_evals（pwsh runner，含 bash 侧 parity）
         shell: pwsh
-        run: pwsh -NoProfile -File evals/run_evals.ps1 -FixturesDir "$env:TEMP/attention-evals-ci"
+        run: |
+          # 跨平台：$env:TEMP 在 Linux 上为空，拼出的 "/attention-evals-ci" 落在文件系统根，
+          # 生成 fixture 时被拒（CI 首次真跑即挂在这里）。RUNNER_TEMP 在所有 runner 上都有。
+          $base = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { [System.IO.Path]::GetTempPath() }
+          $fx = Join-Path $base 'attention-evals-ci'
+          pwsh -NoProfile -File evals/run_evals.ps1 -FixturesDir $fx
 
       - name: smoke_test（双实现语义断言）
         shell: pwsh

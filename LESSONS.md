@@ -35,6 +35,8 @@
 - 失误：fixture 生成里的 `git init`/`add`/`commit` 失败被 `>/dev/null 2>&1` 吞掉，21 个 fixture 悄悄退化成非 git 目录，回归报 152 条"字段不存在"假失败 → 规则：fixture 生成里的 git 写操作失败必须 `die`/`throw` 并带 git 原始 stderr（退出 2），不得 exit 0 放过
 - 失误：断言表涨到 83 条，四份文档还写着 81 条 → 规则：改动 `script-assertions.json` 时同步 `AGENTS.md`/`README.md`/`docs/DEVELOPMENT-PLAN.md`/`docs/VALIDATION.md` 里的条数与 checks 总数
 - 失误：CI 负例与产物打包说明和 GitHub 官方行为不符 → 规则：调研结论必须对照官方文档，不照抄假设（commit 840a38f）
+- 失误：`.github/workflows/ci.yml` 写好后**从未真正跑过**（仓库私有 + Actions 计费未启动），转公开后首次真跑即挂：`$env:TEMP` 在 Linux 上为空，fixtures 目录落到 `/attention-evals-ci` 被拒 → 规则：写了 CI 不等于 CI 能跑，必须有**一次真实的绿色 run** 才能声称"已适配"；临时目录一律用 runner 提供的跨平台变量（`RUNNER_TEMP` / `${{ runner.temp }}`）
+- 失误：`.ps1` 缺 `fixtures.sh` 的根目录守卫（`.ps1` 会无条件 `Remove-Item -Recurse`）→ 规则：两面实现凡有"删除/重建目录"的分支，两侧都要有等价的路径守卫，不能只在一侧补
 
 ## 安全与不可逆动作
 

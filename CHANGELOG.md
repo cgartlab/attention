@@ -9,6 +9,9 @@
 ### Fixed
 - **fixture 生成不再吞掉 git 失败**（`evals/fixtures.sh` / `evals/fixtures.ps1`）：`git init` / `git add` / `git commit` 失败现在退出 2 并打印 git 原始 stderr，runner 随之报"fixtures.sh 失败"。此前这些调用一律 `>/dev/null 2>&1`，于是在关掉 MSYS 路径转换的 shell（`MSYS2_ARG_CONV_EXCL=*`，某些 Agent 运行时会设置）里 `git -C /c/...` 报 `cannot change to`、21 个 fixture 全部退化成"非 git 目录"，生成器照样 exit 0——回归因此报出 **152 条"字段不存在"假失败**，把"生成失败"伪装成"断言失败"。
 
+- **CI 的 pwsh job 在 Linux 上必挂（仓库转公开后首次真跑才暴露）**：`.github/workflows/ci.yml` 用 `$env:TEMP` 拼 fixtures 目录，而 Linux 上该变量为空 → 拼出 `/attention-evals-ci`（文件系统根下）被拒，`run_evals` 立刻以 `Access to the path ... is denied` 失败。改用 `RUNNER_TEMP`（缺失时回退 `[System.IO.Path]::GetTempPath()`）。
+- **`fixtures.ps1` 补根目录守卫**（与 `fixtures.sh` 对齐）：`-OutDir` 为 `/`、`C:\`、`. `、`..` 时立即 `Fail` 退出 2。此前 `.ps1` 只有 `.sh` 有这个守卫，而 `.ps1` 会无条件 `Remove-Item -Recurse -Force`——指错一次就是删盘。`fixtures.sh` 头部"两实现的三条差异"里该差异随之消除。
+
 ### Docs
 - 断言条数与校验总数同步真实值：`AGENTS.md`、`README.md`、`docs/DEVELOPMENT-PLAN.md`、`docs/VALIDATION.md` 此前仍写"81 条断言"，实际为 83 条；`docs/VALIDATION.md` §2 的回归结果由 553 更新为 557 checks，并新增"fixture 生成失败必须可见"的说明与手工复现命令。
 

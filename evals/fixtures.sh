@@ -11,7 +11,7 @@
 #   bash evals/fixtures.sh [--out-dir <path>] [--json]
 #
 # 与 fixtures.ps1 的差异（仅以下三条，其余逐条对齐 ID/目录名/文件内容/git 状态）：
-#   1. 拒绝把 --out-dir 指到文件系统根或 . / ..（.ps1 会无条件 Remove-Item -Recurse 掉它）。
+#   1. （已消除）原先只有 .sh 拒绝把 --out-dir 指到文件系统根；现在 .ps1 也有同样守卫。
 #   2. out_dir / path 在 MSYS/Cygwin（有 cygpath）下输出 Windows 形式，与 fixtures.ps1
 #      的文本一致；其他平台原样输出 POSIX 路径。
 #   3. 用 trap 清理本次的临时文件（.ps1 无临时文件）。
