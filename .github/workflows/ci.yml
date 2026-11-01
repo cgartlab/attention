@@ -41,6 +41,31 @@ jobs:
           python3 -V
           git --version
 
+      # 打包层硬门：frontmatter 坏了，CI 之前是完全看不出来的（实测踩过：结束分隔符
+      # 被粘到上一行，skill 加载器读不到 name/description，而 5 个采集脚本的断言全绿）。
+      - name: 校验 SKILL.md frontmatter
+        run: |
+          python3 - <<'PY'
+          import sys
+          from pathlib import Path
+
+          p = Path("SKILL.md")
+          if not p.exists():
+              sys.exit("::error::SKILL.md 不存在")
+          lines = p.read_text(encoding="utf-8").splitlines()
+          if not lines or lines[0].strip() != "---":
+              sys.exit("::error::SKILL.md 第一行必须是独立的 ---")
+          try:
+              end = next(i for i in range(1, min(len(lines), 60)) if lines[i].strip() == "---")
+          except StopIteration:
+              sys.exit("::error::SKILL.md 的 frontmatter 没有独立的结束 ---（分隔符可能被粘到了上一行）")
+          fm = lines[1:end]
+          for key in ("name:", "description:"):
+              if not any(l.startswith(key) for l in fm):
+                  sys.exit(f"::error::frontmatter 缺少 {key}")
+          print(f"OK: frontmatter 在第 {end + 1} 行闭合，含 name/description")
+          PY
+
       # bash 侧 runner 需要 python 做严格 JSON 校验；缺了它会明确 SKIP 并退出 2（不会假装通过）
       - name: run_evals（bash runner）
         run: bash evals/run_evals.sh --fixtures-dir "$RUNNER_TEMP/attention-evals-ci-sh"

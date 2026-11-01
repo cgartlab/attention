@@ -7,7 +7,8 @@ metadata:
   kind: skill
   version: "0.1.1"
   date: "2026-10-03"
-  reference: "https://github.com/cgartlab/attention"---
+  reference: "https://github.com/cgartlab/attention"
+---
 
 # 立正Skill
 

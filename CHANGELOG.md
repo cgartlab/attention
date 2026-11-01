@@ -22,6 +22,8 @@
 - **带图文档不算 UI**：任意 `.md` 里新增/修改图片引用 → 可自动合并；仅"文件名本身是视觉规范"（`design`/`visual`/`brand`/`logo`/`icon`/`theme`）仍按强 UI。
 
 ### Fixed
+- **SKILL.md frontmatter 结束分隔符被粘到上一行**（`8f9662e` 引入，直推 main 时产生）：`reference: "…"---` 导致 frontmatter 没有独立闭合行，依赖标准 frontmatter 的加载器（`skills` CLI / 各家 harness）读不到 `name` / `description` / `metadata`，而当时的 5 个采集脚本断言与 CI **全绿**——典型的"打包层没人验"。已修复为独立一行，并补上 `metadata.kind: skill`（保留原提交意图）。
+- **CI 增加 SKILL.md frontmatter 结构校验**（`ci.yml`，bash job）：第一行必须是独立 `---`、60 行内必须出现独立的结束 `---`、必须含 `name` / `description`。零依赖（只用 python3 标准库），专治上面那类"文件坏了但测试全绿"。
 - **fixture 生成不再吞掉 git 失败**（`evals/fixtures.sh` / `evals/fixtures.ps1`）：`git init` / `git add` / `git commit` 失败现在退出 2 并打印 git 原始 stderr，runner 随之报"fixtures.sh 失败"。此前这些调用一律 `>/dev/null 2>&1`，于是在关掉 MSYS 路径转换的 shell（`MSYS2_ARG_CONV_EXCL=*`，某些 Agent 运行时会设置）里 `git -C /c/...` 报 `cannot change to`、21 个 fixture 全部退化成"非 git 目录"，生成器照样 exit 0——回归因此报出 **152 条"字段不存在"假失败**，把"生成失败"伪装成"断言失败"。
 - **CI 的 pwsh job 在 Linux 上必挂（仓库转公开后首次真跑才暴露）**：`.github/workflows/ci.yml` 用 `$env:TEMP` 拼 fixtures 目录，而 Linux 上该变量为空 → 拼出 `/attention-evals-ci`（文件系统根下）被拒，`run_evals` 立刻以 `Access to the path ... is denied` 失败。改用 `RUNNER_TEMP`（缺失时回退 `[System.IO.Path]::GetTempPath()`）。
 - **`fixtures.ps1` 补根目录守卫**（与 `fixtures.sh` 对齐）：`-OutDir` 为 `/`、`C:\`、`.`、`..` 时立即 `Fail` 退出 2。此前只有 `.sh` 有这个守卫，而 `.ps1` 会无条件 `Remove-Item -Recurse -Force`——指错一次就是删盘。`fixtures.sh` 头部"两实现的三条差异"里该差异随之消除。
